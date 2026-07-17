@@ -31,6 +31,12 @@ RUNTIME_TESTS = SCRIPT_DIR / "run_self_tests.py"
 RUNTIME_MANIFEST = SCRIPT_DIR / "runtime_manifest.py"
 PACKAGE_TOOL = SCRIPT_DIR / "package_skill.py"
 CONTRACT_VALIDATOR = SCRIPT_DIR / "validate_audit_contract.py"
+SELF_TESTS_WORKFLOW = (
+    SCRIPT_DIR.parent / ".github" / "workflows" / "self-tests.yml"
+)
+RELEASE_WORKFLOW = (
+    SCRIPT_DIR.parent / ".github" / "workflows" / "release-skill.yml"
+)
 
 
 def load_module(path: Path, name: str) -> Any:
@@ -1360,6 +1366,78 @@ def run_cross_platform_contract_path_case() -> dict[str, Any]:
     }
 
 
+def run_workflow_configuration_case() -> dict[str, Any]:
+    """Pin Node 24 actions and avoid duplicate branch-and-tag self-tests."""
+
+    try:
+        self_tests = SELF_TESTS_WORKFLOW.read_text(encoding="utf-8")
+        release = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+        failures: list[str] = []
+
+        expected_self_trigger = (
+            "    branches:\n"
+            '      - "**"\n'
+            "  pull_request:\n"
+            "  workflow_dispatch:\n"
+        )
+        if expected_self_trigger not in self_tests:
+            failures.append("Self Tests is not restricted to branch pushes")
+        if "    tags:\n" not in release or '      - "v*"\n' not in release:
+            failures.append("Release Skill lost its release-tag trigger")
+
+        expected_self_actions = [
+            "uses: actions/checkout@"
+            "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
+            "uses: actions/setup-python@"
+            "ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0",
+        ]
+        expected_release_actions = [
+            "uses: actions/checkout@"
+            "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
+            "uses: actions/setup-python@"
+            "ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0",
+            "uses: actions/upload-artifact@"
+            "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+            "uses: actions/upload-artifact@"
+            "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+            "uses: actions/download-artifact@"
+            "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1",
+        ]
+
+        def action_lines(source: str) -> list[str]:
+            return [
+                line.strip()
+                for line in source.splitlines()
+                if line.strip().startswith("uses: actions/")
+            ]
+
+        actual_self_actions = action_lines(self_tests)
+        actual_release_actions = action_lines(release)
+        if actual_self_actions != expected_self_actions:
+            failures.append(
+                f"unexpected Self Tests action pins: {actual_self_actions!r}"
+            )
+        if actual_release_actions != expected_release_actions:
+            failures.append(
+                f"unexpected Release Skill action pins: {actual_release_actions!r}"
+            )
+
+        ok = not failures
+        reason = "; ".join(failures)
+    except Exception as exc:
+        ok = False
+        reason = f"workflow configuration check raised {type(exc).__name__}: {exc}"
+    return {
+        "name": "CI workflows pin Node 24 actions without duplicate tag self-tests",
+        "fixture": str(SELF_TESTS_WORKFLOW),
+        "expected_exit": 0,
+        "actual_exit": 0 if ok else 1,
+        "expected_code": "workflow trigger and immutable action pins",
+        "result": "PASS" if ok else "FAIL",
+        "reason": reason,
+    }
+
+
 def render_results(results: list[dict[str, Any]]) -> int:
     headers = ["Test", "Expected", "Actual", "Finding", "Result", "Reason"]
     rows = [
@@ -1404,6 +1482,8 @@ def main() -> int:
             RUNTIME_MANIFEST,
             PACKAGE_TOOL,
             CONTRACT_VALIDATOR,
+            SELF_TESTS_WORKFLOW,
+            RELEASE_WORKFLOW,
         )
         if not path.is_file()
     ]
@@ -1422,6 +1502,7 @@ def main() -> int:
         ("independent evaluator scratch-boundary tests", run_independent_evaluator_case),
         ("runtime/source test boundary", run_runtime_surface_split_case),
         ("cross-platform contract path identity", run_cross_platform_contract_path_case),
+        ("CI workflow configuration", run_workflow_configuration_case),
     )
     results = []
     for label, case in cases:

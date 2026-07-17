@@ -6,6 +6,13 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+### Changed
+
+- Updated official GitHub Actions to immutable Node 24-native releases.
+- Limited the cross-platform Self Tests workflow to branch pushes, pull
+  requests, and manual dispatches so atomic branch-and-tag releases do not run
+  the same matrix twice; tag validation remains in Release Skill.
+
 ## [v2.0.1] - 2026-07-17
 
 ### Fixed
