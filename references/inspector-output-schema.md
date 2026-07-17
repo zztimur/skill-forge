@@ -8,7 +8,7 @@ The inspector is deterministic evidence collection, not the full audit. Always c
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | Integer JSON-contract version. Version `5` adds cross-platform path-policy evidence for ZIP and direct-folder inputs. Version `4` made manifest-verification completeness part of strict pass semantics and limited finding aggregation to inspector-owned sections. Consumers using path-policy evidence should require version 5 or later. |
+| `schema_version` | Integer JSON-contract version. Version `6` replaces raw parsed frontmatter with a redacted structural summary. Version `5` added cross-platform path-policy evidence for ZIP and direct-folder inputs. Consumers requiring redacted frontmatter output must require version 6 or later. |
 | `input` | Original path passed to the inspector. |
 | `input_exists` | Whether the path exists. |
 | `input_type` | One of `zip`, `directory`, or `other`. |
@@ -33,7 +33,7 @@ The inspector is deterministic evidence collection, not the full audit. Always c
 | `size_summary` | File count, total uncompressed bytes, and largest files under the detected Skill root. |
 | `skill_md_files` | `SKILL.md` paths found under the detected Skill root, relative to that root. |
 | `skill_md_count` | Count of `SKILL.md` files under the detected Skill root. |
-| `frontmatter` | Parsed YAML frontmatter from the detected root `SKILL.md`, when available. |
+| `frontmatter` | Redacted structural summary of parsed YAML frontmatter from the detected root `SKILL.md`, when available. Raw descriptions, metadata values, unknown key names, and other package-controlled scalar values are never included. |
 | `frontmatter_error` | Frontmatter extraction error, if any. |
 | `name_valid_hyphen_case` | Boolean check for lowercase hyphen-case Skill name. |
 | `description_length` | Character count of the frontmatter description. |
@@ -47,6 +47,21 @@ The inspector is deterministic evidence collection, not the full audit. Always c
 | `dangerous_command_note` | Reminder that dangerous-command scanning is heuristic and non-exhaustive across shell, PowerShell, Windows batch, Python, and JavaScript/TypeScript, but high-confidence findings and executable code outside the root fail strict validation. |
 | `strict_mode_note` | Summary of how `--strict` treats error-level findings, incomplete scan coverage, and unverified critical manifests. |
 | `effective_limits` | Safety, scan, and output limits used for this run. `max_input_zip_bytes`, `inspector_input_zip_limit_bytes`, and the retained `skill_upload_limit_bytes` compatibility field are Skill Forge safety boundaries; `target_product_upload_limit_bytes` is a documented host limit when available. |
+
+## Schema 6 Frontmatter Migration
+
+Schema 5 exposed the complete parsed frontmatter mapping. Schema 6 deliberately
+replaces it with bounded structural evidence. Consumers must use
+`frontmatter.validated_name`, `present_keys`, `value_types`,
+`unrecognized_key_count`, and `description_length`; they must not expect
+description text, dependency values, nested metadata, or unknown key names.
+
+`validated_name` is non-null only after the selected target's name shape and
+length checks pass and no high-confidence secret or PII shape is detected.
+`present_keys` and `value_types` cover recognized top-level
+keys only. Unknown keys and all parser-controlled internal markers are reduced
+to counts or separate findings. The top-level `description_length` field is
+retained for compatibility and matches `frontmatter.description_length`.
 
 ## Summary Field
 
@@ -83,8 +98,8 @@ Common properties:
 | `message` | Human-readable explanation. |
 | `file` | Relative file path when applicable. |
 | `limit`, `bytes`, `ratio`, `risk`, `pattern` | Optional evidence fields for size, compression, and secret findings. |
-| `expected`, `actual` | Optional evidence for name/directory findings: the expected name and the actual directory name. For `zip_missing_top_level_skill_folder`, `expected` is the skill name the archive's top-level folder should have used. |
-| `keys`, `length`, `normalized_path`, `conflicts_with` | Optional evidence for frontmatter key findings, length findings, and ZIP identity findings. `conflicts_with` identifies the earlier colliding member path. |
+| `expected` | Optional safe evidence for name/directory findings. For `zip_missing_top_level_skill_folder`, `expected` is the validated, non-sensitive skill name the archive's top-level folder should have used, or `null` when that value was suppressed. |
+| `keys`, `key_count`, `length`, `normalized_path`, `conflicts_with` | Optional evidence for recognized frontmatter keys, redacted unknown-key counts, length findings, and ZIP identity findings. `conflicts_with` identifies the earlier colliding member path. |
 
 ## Severity-Bearing Finding Sections
 
@@ -380,7 +395,7 @@ their meaning.
 
 ```json
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "target": "portable",
   "requested_target": "portable",
   "canonical_target": "portable",
@@ -413,9 +428,17 @@ their meaning.
   "skill_md_count": 1,
   "skill_md_files": ["SKILL.md"],
   "frontmatter": {
-    "name": "skill-forge",
-    "description": "evaluate uploaded agent skills..."
+    "redacted": true,
+    "validated_name": "skill-forge",
+    "present_keys": ["description", "name"],
+    "value_types": {
+      "description": "string",
+      "name": "string"
+    },
+    "unrecognized_key_count": 0,
+    "description_length": 175
   },
+  "description_length": 175,
   "zip_preflight_findings": [],
   "directory_preflight_findings": [],
   "outside_root_findings": [],

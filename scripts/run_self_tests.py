@@ -35,6 +35,9 @@ FAKE_AWS_ACCESS_KEY = "AKIA" + "A" * 16
 FAKE_GOOGLE_API_KEY = "AIza" + "A" * 35
 FAKE_GITLAB_TOKEN = "glpat-" + "A" * 20
 FAKE_GITHUB_FINE_GRAINED_TOKEN = "github_pat_" + "A" * 82
+FAKE_LOWERCASE_OPENAI_KEY = "sk-" + "a" * 32
+FAKE_FRONTMATTER_PII = "fixture.user" + "@example.invalid"
+FAKE_FRONTMATTER_PRIVATE_VALUE = "private-customer-record-" + "R" * 16
 EXPECTED_SYNTHETIC_RUNTIME_ZIP_SHA256 = (
     "6f58a416a23d0dee5fe6e0a818febd49e57d39c043a7cc6f433e4f2b1ff28831"
 )
@@ -108,6 +111,7 @@ class TestCase:
     extra_args: tuple[str, ...] = ()
     expected_severity: Optional[str] = None
     expected_stderr: Optional[str] = None
+    forbidden_output: tuple[str, ...] = ()
     strict: bool = True
 
 
@@ -157,6 +161,41 @@ def build_valid_skill_with_multiline_dependencies(tmp: Path) -> Path:
         "  - pyyaml\n"
         "---\n\n"
         "# Dependency Skill\n",
+        encoding="utf-8",
+    )
+    return skill
+
+
+def build_sensitive_frontmatter_skill(tmp: Path) -> Path:
+    """Frontmatter values may drive findings but must never be re-emitted."""
+    skill = tmp / "frontmatter-redaction-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text(
+        "---\n"
+        "name: frontmatter-redaction-skill\n"
+        "description: evaluate uploaded skill frontmatter while protecting "
+        + FAKE_FRONTMATTER_PII
+        + " and "
+        + FAKE_OPENAI_KEY
+        + ".\n"
+        "metadata:\n"
+        "  contact: " + FAKE_FRONTMATTER_PII + "\n"
+        "  private_note: " + FAKE_FRONTMATTER_PRIVATE_VALUE + "\n"
+        "---\n\n# Frontmatter Redaction Skill\n",
+        encoding="utf-8",
+    )
+    return skill
+
+
+def build_sensitive_frontmatter_name_skill(tmp: Path) -> Path:
+    """Even a name-shaped secret must not become a public validated_name."""
+    skill = tmp / "sensitive-frontmatter-name-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text(
+        "---\n"
+        "name: " + FAKE_LOWERCASE_OPENAI_KEY + "\n"
+        "description: evaluate uploaded skill frontmatter with a sensitive name while keeping diagnostics redacted.\n"
+        "---\n\n# Sensitive Frontmatter Name Skill\n",
         encoding="utf-8",
     )
     return skill
@@ -1840,8 +1879,8 @@ def check_custom_input_zip_limit(data: dict[str, Any]) -> tuple[bool, str]:
 
 
 def check_valid_summary(data: dict[str, Any]) -> tuple[bool, str]:
-    if data.get("schema_version") != 5:
-        return False, f"expected schema_version 5, got {data.get('schema_version')!r}"
+    if data.get("schema_version") != 6:
+        return False, f"expected schema_version 6, got {data.get('schema_version')!r}"
     if data.get("detected_root_relative") != "sample-skill":
         return False, f"expected stable detected_root_relative 'sample-skill', got {data.get('detected_root_relative')!r}"
     if data.get("coverage_complete") is not True:
@@ -1864,6 +1903,17 @@ def check_valid_summary(data: dict[str, Any]) -> tuple[bool, str]:
     for key, value in expected.items():
         if summary.get(key) != value:
             return False, f"expected summary[{key!r}]={value!r}, got {summary.get(key)!r}"
+    frontmatter = data.get("frontmatter")
+    expected_frontmatter = {
+        "redacted": True,
+        "validated_name": "sample-skill",
+        "present_keys": ["description", "name"],
+        "value_types": {"description": "string", "name": "string"},
+        "unrecognized_key_count": 0,
+        "description_length": data.get("description_length"),
+    }
+    if frontmatter != expected_frontmatter:
+        return False, f"unexpected redacted frontmatter summary: {frontmatter!r}"
     return True, ""
 
 
@@ -1936,41 +1986,61 @@ def run_rejected_portable_extraction_case(workdir: Path) -> dict[str, Any]:
 
 
 def check_multiline_dependencies(data: dict[str, Any]) -> tuple[bool, str]:
-    dependencies = data.get("frontmatter", {}).get("dependencies")
-    if dependencies != ["requests", "pyyaml"]:
-        return False, f"expected parsed dependencies list, got {dependencies!r}"
+    frontmatter = data.get("frontmatter", {})
+    if frontmatter.get("value_types", {}).get("dependencies") != "sequence":
+        return False, f"expected dependencies sequence evidence, got {frontmatter!r}"
+    if "dependencies" not in frontmatter.get("present_keys", []):
+        return False, f"expected dependencies in present_keys, got {frontmatter!r}"
     if has_code(data, "frontmatter_unexpected_keys"):
         return False, "valid dependencies list was treated as unexpected frontmatter"
     return True, ""
 
 
 def check_quoted_frontmatter_with_comment(data: dict[str, Any]) -> tuple[bool, str]:
-    description = data.get("frontmatter", {}).get("description")
     expected = "evaluate skill packages with a literal # marker and colon: safely when validating fixtures."
-    if description != expected:
-        return False, f"quoted scalar/comment parsed incorrectly: {description!r}"
+    frontmatter = data.get("frontmatter", {})
+    if frontmatter.get("description_length") != len(expected):
+        return False, f"quoted scalar/comment length is wrong: {frontmatter!r}"
+    if frontmatter.get("value_types", {}).get("description") != "string":
+        return False, f"quoted description type is wrong: {frontmatter!r}"
     return True, ""
 
 
 def check_nested_metadata_frontmatter(data: dict[str, Any]) -> tuple[bool, str]:
-    metadata = data.get("frontmatter", {}).get("metadata")
-    if metadata != {"owner": "quality", "labels": ["portable"]}:
-        return False, f"nested metadata parsed incorrectly: {metadata!r}"
+    frontmatter = data.get("frontmatter", {})
+    if frontmatter.get("value_types", {}).get("metadata") != "mapping":
+        return False, f"nested metadata type is wrong: {frontmatter!r}"
     return True, ""
 
 
-def check_nested_hook_sequence(data: dict[str, Any]) -> tuple[bool, str]:
-    hooks = data.get("frontmatter", {}).get("hooks")
+def check_sensitive_frontmatter_is_redacted(data: dict[str, Any]) -> tuple[bool, str]:
+    frontmatter = data.get("frontmatter", {})
     expected = {
-        "PreToolUse": [{
-            "matcher": "Bash",
-            "hooks": [{"type": "command", "command": "./check.sh"}],
-        }],
+        "redacted": True,
+        "validated_name": "frontmatter-redaction-skill",
+        "present_keys": ["description", "metadata", "name"],
+        "value_types": {
+            "description": "string",
+            "metadata": "mapping",
+            "name": "string",
+        },
+        "unrecognized_key_count": 0,
     }
-    if hooks != expected:
-        return False, f"nested hook sequence parsed incorrectly: {hooks!r}"
-    if has_code(data, "frontmatter_parse_error") or has_code(data, "frontmatter_yaml_unsupported"):
-        return False, "supported nested hook mapping was not fully parsed"
+    for key, value in expected.items():
+        if frontmatter.get(key) != value:
+            return False, f"frontmatter redaction evidence mismatch for {key}: {frontmatter!r}"
+    if not has_code(data, "secret_openai_api_key"):
+        return False, "synthetic secret finding was lost during redaction"
+    return True, ""
+
+
+def check_sensitive_frontmatter_name_is_redacted(data: dict[str, Any]) -> tuple[bool, str]:
+    if data.get("frontmatter", {}).get("validated_name") is not None:
+        return False, "sensitive name was exposed as a public validated_name"
+    if not has_code(data, "secret_openai_api_key"):
+        return False, "sensitive name no longer produced its secret finding"
+    if not has_code(data, "frontmatter_name_directory_mismatch"):
+        return False, "internal name validation stopped checking the directory mismatch"
     return True, ""
 
 
@@ -2075,7 +2145,7 @@ def check_escaping_resource_reference(data: dict[str, Any]) -> tuple[bool, str]:
 
 
 def check_bom_frontmatter(data: dict[str, Any]) -> tuple[bool, str]:
-    if data.get("frontmatter", {}).get("name") != "bom-skill":
+    if data.get("frontmatter", {}).get("validated_name") != "bom-skill":
         return False, f"BOM SKILL.md name not parsed: {data.get('frontmatter')!r}"
     if has_code(data, "frontmatter_missing_or_invalid"):
         return False, "BOM SKILL.md wrongly reported as missing/invalid frontmatter"
@@ -2091,18 +2161,26 @@ def check_optional_platform_keys(data: dict[str, Any]) -> tuple[bool, str]:
 
 
 def check_block_scalar_description(data: dict[str, Any]) -> tuple[bool, str]:
-    desc = data.get("frontmatter", {}).get("description", "")
-    if "# this hash line is literal content" not in desc:
-        return False, f"block scalar dropped the '#' content line: {desc!r}"
-    if "\n\n" not in desc:
-        return False, f"block scalar dropped the blank content line: {desc!r}"
+    expected = (
+        "evaluate agent skill packages that use a literal block scalar description here.\n"
+        "# this hash line is literal content, not a comment\n\n"
+        "it also keeps the blank line above. use only for fixtures."
+    )
+    actual = data.get("frontmatter", {}).get("description_length")
+    if actual != len(expected):
+        return False, f"block scalar parsed length {actual!r}, expected {len(expected)!r}"
     return True, ""
 
 
 def check_indented_delimiter_block_scalar(data: dict[str, Any]) -> tuple[bool, str]:
-    description = data.get("frontmatter", {}).get("description", "")
-    if "\n---\n" not in description:
-        return False, f"indented delimiter closed frontmatter instead of remaining content: {description!r}"
+    expected = (
+        "evaluate a block scalar whose content includes a delimiter-looking line.\n"
+        "---\n"
+        "that indented line remains part of the description."
+    )
+    actual = data.get("frontmatter", {}).get("description_length")
+    if actual != len(expected):
+        return False, f"indented-delimiter length {actual!r}, expected {len(expected)!r}"
     return True, ""
 
 
@@ -3748,6 +3826,11 @@ def run_case(case: TestCase, workdir: Path) -> dict[str, Any]:
     if ok and case.expected_stderr and case.expected_stderr not in proc.stderr:
         ok = False
         reason = f"expected stderr to contain {case.expected_stderr!r}, got {proc.stderr.strip()!r}"
+    if ok and case.forbidden_output:
+        combined_output = proc.stdout + proc.stderr
+        if any(value in combined_output for value in case.forbidden_output):
+            ok = False
+            reason = "inspector re-emitted a forbidden raw frontmatter fixture value"
     if ok and case.checker:
         ok, reason = case.checker(data)
     return {
@@ -3766,6 +3849,28 @@ def main() -> int:
         TestCase("clean runtime package has complete coverage", build_valid_skill_zip, 0, checker=check_valid_summary),
         TestCase("valid Skill without OpenAI metadata", build_valid_skill_without_openai_metadata, 0),
         TestCase("valid Skill with multiline dependencies", build_valid_skill_with_multiline_dependencies, 0, "frontmatter_platform_optional_keys", checker=check_multiline_dependencies),
+        TestCase(
+            "sensitive frontmatter values are redacted",
+            build_sensitive_frontmatter_skill,
+            2,
+            "secret_openai_api_key",
+            checker=check_sensitive_frontmatter_is_redacted,
+            forbidden_output=(
+                FAKE_OPENAI_KEY,
+                FAKE_FRONTMATTER_PII,
+                FAKE_FRONTMATTER_PRIVATE_VALUE,
+            ),
+            expected_severity="error",
+        ),
+        TestCase(
+            "sensitive frontmatter name is redacted",
+            build_sensitive_frontmatter_name_skill,
+            2,
+            "secret_openai_api_key",
+            checker=check_sensitive_frontmatter_name_is_redacted,
+            forbidden_output=(FAKE_LOWERCASE_OPENAI_KEY,),
+            expected_severity="error",
+        ),
         TestCase("template marker warning", build_todo_marker_skill, 0, "template_marker_found", checker=check_template_marker_shape, expected_severity="warning"),
         TestCase("missing SKILL.md", build_missing_skill_md, 2, "skill_md_missing", expected_severity="error"),
         TestCase("invalid frontmatter", build_invalid_frontmatter, 2, "frontmatter_invalid_name", expected_severity="error"),

@@ -30,7 +30,7 @@ Report mode changes detail, never the evidence boundary or safety floor.
 - Target contract sources: `audit-contract.json` → one `target_contracts.<selected profile>` per profile
 - Artifact-content trust: untrusted evidence only; conflicting directives ignored
 - Skill Forge evaluator provenance: current-checkout/self-test evidence / separately installed pretrusted and pinned evaluator / unavailable
-- Independent evaluator pins and schema: complete-tree SHA-256; candidate SHA-256; optional inspector SHA-256; exact inspector schema version 5 / Not Assessed with reason
+- Independent evaluator pins and schema: complete-tree SHA-256; candidate SHA-256; optional inspector SHA-256; exact inspector schema version 6 / Not Assessed with reason
 - Unverified limits or unavailable evidence:
 - Evidence labels: Verified / Inferred / Unverified
 
@@ -44,7 +44,7 @@ Report mode changes detail, never the evidence boundary or safety floor.
 - Directory preflight findings for direct folder inputs, including root symlinks:
 - Unexpected files outside detected skill root:
 - Skill Forge strict inspection: Pass / Fail / Partial / Not Assessed / Not Applicable; state whether evidence is self-inspection or independently pinned
-- Inspector schema version and compatibility: exact version 5 for the independent-evaluator helper / Not Assessed with reason
+- Inspector schema version and compatibility: exact version 6 for the independent-evaluator helper / Not Assessed with reason
 - Independent evaluator result: pass / fail / not_assessed / Not Applicable; report all canonical-profile results and the trust/sandbox limitations
 - Skill Forge runtime manifest archive integrity: Pass / Fail / Not Assessed / Not Applicable
 - Skill Forge local source proof: Pass / Fail / Not Assessed / Not Applicable; name the caller-selected repository and do not imply remote or signer authenticity

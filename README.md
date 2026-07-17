@@ -111,7 +111,7 @@ Human-readable markdown output is available by omitting `--json`:
 python3 -S scripts/inspect_skill_package.py /path/to/skill-or-skill.zip
 ```
 
-The markdown output ends with a status and finding-count footer. JSON output includes a versioned `schema_version`, a stable `detected_root_relative` path for ZIP automation, explicit `requested_target` / `canonical_target` / alias fields, and a top-level `summary` object for release-gate and CI integrations.
+The markdown output ends with a status and finding-count footer. JSON output includes a versioned `schema_version`, a redacted structural `frontmatter` summary, a stable `detected_root_relative` path for ZIP automation, explicit `requested_target` / `canonical_target` / alias fields, and a top-level `summary` object for release-gate and CI integrations. Schema 6 no longer emits raw frontmatter values.
 
 ## Compatibility notes
 
@@ -252,7 +252,7 @@ python3 -S scripts/verify_independent_evaluator.py \
 ```
 
 The required evaluator pin must come from prior trusted evidence, not from the
-candidate checkout during the same run. Inspector schema `5` is required;
+candidate checkout during the same run. Inspector schema `6` is required;
 stale schemas, missing provenance, timeouts, and output-limit failures are
 **Not Assessed**, never Pass. Exit codes are `0` Pass, `2` Fail, and `3` Not
 Assessed. The helper does not provide an OS filesystem sandbox or network

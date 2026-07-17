@@ -36,7 +36,7 @@ MAX_COMPRESSION_RATIO = 100.0
 MAX_READ_BYTES = 1_000_000
 # This is an inspector resource boundary, not a vendor upload claim.
 MAX_INSPECTOR_INPUT_ZIP_BYTES = 30_000_000
-INSPECTION_SCHEMA_VERSION = 5
+INSPECTION_SCHEMA_VERSION = 6
 ZIP_STREAM_CHUNK_BYTES = 1024 * 1024
 TEXT_SNIFF_BYTES = 8192
 MAX_YAML_NESTING_DEPTH = 64
@@ -93,6 +93,10 @@ SECRET_CONTENT_PATTERNS = [
     ("api key assignment", "secret_api_key_assignment", "error", re.compile(r"(?i)\b(api[_-]?key|access[_-]?token|secret[_-]?key|client[_-]?secret|refresh[_-]?token)\b\s*[:=]\s*['\"]?[A-Za-z0-9_./+=:-]{12,}")),
     ("password assignment", "secret_password_assignment", "warning", re.compile(r"(?i)\bpassword\b\s*[:=]\s*['\"]?[^'\"\s]{8,}")),
 ]
+HIGH_CONFIDENCE_PII_PATTERNS = (
+    re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE),
+    re.compile(r"(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)"),
+)
 RESOURCE_REF_PATTERN = re.compile(r"`((?:scripts|references|assets)/[^`\s]+)`|\]\(((?:scripts|references|assets)/[^)\s]+)\)")
 SHELL_SCRIPT_EXTENSIONS = {".bash", ".command", ".ksh", ".sh", ".zsh"}
 POWERSHELL_SCRIPT_EXTENSIONS = {".ps1", ".psm1", ".psd1"}
@@ -1084,7 +1088,7 @@ def validate_frontmatter(frontmatter: Dict[str, Any], target: str = "portable") 
             profile.unknown_key_severity,
             profile.unknown_key_code,
             f"frontmatter contains keys not recognized by the {profile.name} target profile",
-            keys=unexpected,
+            key_count=len(unexpected),
         ))
     optional = sorted(set(frontmatter) & OPTIONAL_PLATFORM_FRONTMATTER_KEYS)
     if profile.name == "portable" and optional:
@@ -1109,7 +1113,7 @@ def validate_frontmatter(frontmatter: Dict[str, Any], target: str = "portable") 
                 limit=profile.name_limit,
             ))
         if profile.hyphen_case_name and re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", clean_name) is None:
-            findings.append(finding("error", "frontmatter_invalid_name", f"frontmatter name must be lowercase hyphen-case for the {profile.name} target profile", value=name))
+            findings.append(finding("error", "frontmatter_invalid_name", f"frontmatter name must be lowercase hyphen-case for the {profile.name} target profile"))
     if profile.description_required and not has_description:
         findings.append(finding("error", "frontmatter_description_missing", "frontmatter description is missing or not a string"))
     elif description is not None and not has_description:
@@ -1125,6 +1129,83 @@ def validate_frontmatter(frontmatter: Dict[str, Any], target: str = "portable") 
         if not any(term in lower_desc for term in trigger_terms):
             findings.append(finding("warning", "frontmatter_description_weak_trigger", "description may not clearly explain when to use the skill"))
     return findings
+
+
+def frontmatter_value_type(value: Any) -> str:
+    """Return a stable type label without serializing package-controlled data."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, list):
+        return "sequence"
+    if isinstance(value, dict):
+        return "mapping"
+    return "unsupported"
+
+
+def validated_frontmatter_name(frontmatter: Dict[str, Any], target: str) -> Optional[str]:
+    """Return a name that satisfies the selected target's shape and length."""
+    profile = target_profile(target)
+    name = frontmatter.get("name")
+    if not isinstance(name, str):
+        return None
+    clean_name = name.strip()
+    within_limit = profile.name_limit is None or len(clean_name) <= profile.name_limit
+    valid_shape = not profile.hyphen_case_name or re.fullmatch(
+        r"[a-z0-9]+(?:-[a-z0-9]+)*", clean_name
+    ) is not None
+    return clean_name if clean_name and within_limit and valid_shape else None
+
+
+def contains_sensitive_public_value(value: str) -> bool:
+    """Suppress high-confidence secret or PII shapes from public summaries."""
+    return any(pattern.search(value) for _, _, _, pattern in SECRET_CONTENT_PATTERNS) or any(
+        pattern.search(value) for pattern in HIGH_CONFIDENCE_PII_PATTERNS
+    )
+
+
+def public_frontmatter_summary(frontmatter: Dict[str, Any], target: str) -> Dict[str, Any]:
+    """Summarize parsed frontmatter without re-emitting untrusted values.
+
+    The parser and validators retain the complete mapping internally. JSON and
+    markdown consumers receive only bounded structural evidence plus a name
+    that has already satisfied the selected target's portable name contract.
+    Unknown key names and values are represented only by a count.
+    """
+    profile = target_profile(target)
+    parser_keys = {key for key in frontmatter if key.startswith("_parse_")}
+    recognized_keys = sorted(
+        key for key in frontmatter
+        if key in profile.recognized_frontmatter_keys
+    )
+    unknown_key_count = len(
+        set(frontmatter) - set(profile.recognized_frontmatter_keys) - parser_keys
+    )
+    validated_name = validated_frontmatter_name(frontmatter, target)
+    if validated_name is not None and contains_sensitive_public_value(validated_name):
+        validated_name = None
+    description = frontmatter.get("description")
+    description_length = len(description.strip()) if isinstance(description, str) else None
+    return {
+        "redacted": True,
+        "validated_name": validated_name,
+        "present_keys": recognized_keys,
+        "value_types": {
+            key: frontmatter_value_type(frontmatter[key])
+            for key in recognized_keys
+        },
+        "unrecognized_key_count": unknown_key_count,
+        "description_length": description_length,
+    }
+
+
 def normalize_zip_name(name: str) -> Tuple[Optional[str], Optional[str]]:
     """Backward-compatible single-member view of the shared path policy."""
     member, issue = normalize_member_path(name)
@@ -2236,9 +2317,7 @@ def target_layout_findings(
                 "frontmatter_name_directory_comparison_invalid",
                 f"skill directory name and frontmatter name must produce non-empty Unicode comparison keys for the {profile.name} target profile",
                 directory_name=directory_name,
-                skill_name=clean_name,
                 directory_key=directory_key,
-                skill_key=skill_key,
                 match_mode=profile.directory_name_mode,
             ))
         elif directory_key != skill_key:
@@ -2247,7 +2326,6 @@ def target_layout_findings(
                 "frontmatter_name_directory_mismatch",
                 f"skill directory name must match the frontmatter name for the {profile.name} target profile",
                 expected=directory_name,
-                actual=clean_name,
                 match_mode=profile.directory_name_mode,
             ))
     elif profile.directory_name_mode != "none" and not directory_name_matches(profile, directory_name, clean_name):
@@ -2256,7 +2334,6 @@ def target_layout_findings(
             "frontmatter_name_directory_mismatch",
             f"skill directory name must match the frontmatter name for the {profile.name} target profile",
             expected=directory_name,
-            actual=clean_name,
             match_mode=profile.directory_name_mode,
         ))
     return findings
@@ -2421,31 +2498,31 @@ def inspect(input_path: Path, tree_limit: int = MAX_DEFAULT_TREE_FILES, limits: 
             result["frontmatter_error"] = fm_error
             if frontmatter_text is not None:
                 frontmatter = parse_frontmatter(frontmatter_text)
-                result["frontmatter"] = frontmatter
+                frontmatter_summary = public_frontmatter_summary(frontmatter, canonical)
+                result["frontmatter"] = frontmatter_summary
                 result["frontmatter_validation_findings"] = validate_frontmatter(frontmatter, canonical)
                 if frontmatter.get("_parse_unsupported"):
                     result["unverified_manifests"].append("SKILL.md")
                 name = frontmatter.get("name")
-                description = frontmatter.get("description")
-                if isinstance(name, str) and name.strip():
-                    declared_skill_name = name.strip()
+                declared_skill_name = frontmatter_summary["validated_name"]
+                layout_skill_name = validated_frontmatter_name(frontmatter, canonical)
                 try:
                     directory_name = root.resolve().name
                 except OSError:
                     directory_name = root.name
                 if isinstance(name, str) and name.strip() and zip_without_top_level_folder and not profile.requires_zip_top_level_folder and profile.directory_name_mode != "none":
-                    result["frontmatter_validation_findings"].append(finding("warning", "zip_missing_top_level_skill_folder", "zip has no top-level folder named after the skill; package the skill directory as the archive root so it unpacks into a folder matching the skill name", expected=name.strip()))
+                    result["frontmatter_validation_findings"].append(finding("warning", "zip_missing_top_level_skill_folder", "zip has no top-level folder named after the skill; package the skill directory as the archive root so it unpacks into a folder matching the skill name", expected=frontmatter_summary["validated_name"]))
                 if not (zip_without_top_level_folder and not profile.requires_zip_top_level_folder):
                     result["frontmatter_validation_findings"].extend(target_layout_findings(
                         profile,
                         is_zip=temp_dir is not None,
                         root_relative=result["detected_root_relative"],
                         directory_name=directory_name,
-                        skill_name=name,
+                        skill_name=layout_skill_name,
                         outside_root_findings=result["outside_root_findings"],
                     ))
                 result["name_valid_hyphen_case"] = isinstance(name, str) and re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name.strip()) is not None
-                result["description_length"] = len(description.strip()) if isinstance(description, str) else None
+                result["description_length"] = frontmatter_summary["description_length"]
             else:
                 result["frontmatter_validation_findings"] = [finding("error", "frontmatter_missing_or_invalid", fm_error or "frontmatter missing or invalid")]
             resource_refs = referenced_resources(text, root)
@@ -2581,8 +2658,9 @@ def render_markdown(data: Dict[str, Any]) -> str:
     fm = data.get("frontmatter")
     if fm:
         lines.append("## Frontmatter")
-        lines.append(f"- name: `{fm.get('name')}`")
-        lines.append(f"- description length: {data.get('description_length')}")
+        lines.append(f"- validated name: `{fm.get('validated_name')}`")
+        lines.append(f"- description length: {fm.get('description_length')}")
+        lines.append(f"- parsed values redacted: `{fm.get('redacted') is True}`")
         lines.append(f"- name valid hyphen-case: {data.get('name_valid_hyphen_case')}")
         lines.append("")
     if data.get("outside_root_findings"):

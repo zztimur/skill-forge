@@ -28,7 +28,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 
 SCHEMA_VERSION = 1
-REQUIRED_INSPECTOR_SCHEMA_VERSION = 5
+REQUIRED_INSPECTOR_SCHEMA_VERSION = 6
 SOURCE_REPO = Path(__file__).resolve().parents[1]
 INSPECTOR_RELATIVE_PATH = "scripts/inspect_skill_package.py"
 PROFILES = ("portable", "openai")

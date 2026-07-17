@@ -39,7 +39,7 @@ Use this checklist while reviewing a skill.
 - Validator outcome, gate result, compatibility result, and Skill Forge quality-policy result are reported as separate fields
 - Only an Artifact Fail may support a validator-derived artifact defect; Unavailable and Execution Error are evidence limitations
 - Skill Forge findings, independent-evaluator results, official validator results, and package self-test results are reported separately
-- Independent Skill Forge evidence, when used, records a previously trusted complete-tree SHA-256, expected candidate SHA-256, exact inspector schema `5`, portable/OpenAI result, and declared sandbox limitations; a stale schema is Not Assessed
+- Independent Skill Forge evidence, when used, records a previously trusted complete-tree SHA-256, expected candidate SHA-256, exact inspector schema `6`, portable/OpenAI result, and declared sandbox limitations; a stale schema is Not Assessed
 - Target-bundled scripts are never treated as official evidence or executed solely because their name suggests validation
 - Package self-tests, when run, have a reviewed purpose, provenance assessment, and safe scratch/sandbox plan
 - Inspector finding codes are interpreted using `references/inspector-output-schema.md` when needed

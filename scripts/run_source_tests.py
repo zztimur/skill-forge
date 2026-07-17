@@ -805,7 +805,7 @@ def run_independent_evaluator_case() -> dict[str, Any]:
                 "canonical = 'portable' if mode == 'target-mismatch' else target\n"
                 "coverage = False if mode == 'incomplete' else True\n"
                 "report = {\n"
-                "    'schema_version': 3 if mode == 'stale-schema' else 5,\n"
+                "    'schema_version': 3 if mode == 'stale-schema' else 6,\n"
                 "    'input': sys.argv[1], 'input_exists': True, 'input_type': 'zip',\n"
                 "    'manifest_verification_complete': True,\n"
                 "    'requested_target': target,\n"

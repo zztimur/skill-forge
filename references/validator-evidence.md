@@ -152,7 +152,7 @@ sandbox, and it does not claim continuous immutability. Use it only with an
 evaluator whose complete tree is pretrusted; it is not a safe way to execute an
 arbitrary evaluator.
 
-The inspected JSON must use exactly inspector schema version `5` and satisfy
+The inspected JSON must use exactly inspector schema version `6` and satisfy
 the expected input, target, coverage, manifest-verification, summary, and count
 invariants. An older or newer schema is incompatible and yields **Not
 Assessed**, never Pass. The overall helper states and process exits are `pass`

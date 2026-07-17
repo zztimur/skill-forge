@@ -987,6 +987,8 @@ def validate_inspector_documentation(issues: List[str]) -> None:
         "unscanned_paths",
         "manifest_verification_complete",
         "unverified_manifests",
+        "frontmatter",
+        "description_length",
         "effective_limits",
         "summary",
     }
@@ -999,6 +1001,32 @@ def validate_inspector_documentation(issues: List[str]) -> None:
         issues.append("inspector schema minimal successful example must show canonical portable target identity")
     if example.get("target_alias_used") is not False or example.get("target_deprecation_note") is not None:
         issues.append("inspector schema minimal successful example must show a non-alias target state")
+    frontmatter = example.get("frontmatter")
+    expected_frontmatter_fields = {
+        "redacted",
+        "validated_name",
+        "present_keys",
+        "value_types",
+        "unrecognized_key_count",
+        "description_length",
+    }
+    if not isinstance(frontmatter, dict):
+        issues.append("inspector schema minimal successful example must include a redacted frontmatter summary")
+    else:
+        if set(frontmatter) != expected_frontmatter_fields:
+            issues.append("inspector schema frontmatter example must contain only the schema-6 redacted summary fields")
+        if frontmatter.get("redacted") is not True:
+            issues.append("inspector schema frontmatter example must mark parsed values redacted")
+        present_keys = frontmatter.get("present_keys")
+        value_types = frontmatter.get("value_types")
+        if not isinstance(present_keys, list) or present_keys != sorted(present_keys):
+            issues.append("inspector schema frontmatter present_keys must be a sorted list")
+        if not isinstance(value_types, dict) or set(value_types) != set(present_keys or []):
+            issues.append("inspector schema frontmatter value_types must cover exactly the recognized present_keys")
+        if frontmatter.get("description_length") != example.get("description_length"):
+            issues.append("inspector schema frontmatter and top-level description_length must match")
+        if not isinstance(frontmatter.get("unrecognized_key_count"), int):
+            issues.append("inspector schema frontmatter unrecognized_key_count must be an integer")
     limits = example.get("effective_limits")
     if not isinstance(limits, dict) or set(effective_fields) - set(limits):
         issues.append("inspector schema minimal successful example must include every active effective_limits field")
