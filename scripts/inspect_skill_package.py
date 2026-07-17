@@ -121,7 +121,16 @@ SHELL_SHEBANG_PATTERN = re.compile(r"#!.*\b(?:ba|z|k)?sh\b")
 PYTHON_SHEBANG_PATTERN = re.compile(r"#!.*\bpython(?:[0-9.]*)?\b")
 JAVASCRIPT_SHEBANG_PATTERN = re.compile(r"#!.*\b(?:node|deno|bun)\b")
 DANGEROUS_COMMAND_PATTERNS = [
-    ("remote script piped into a shell", re.compile(r"\b(?:curl|wget|fetch)\b[^\n|;]*\|\s*(?:(?:env|command)\s+)?(?:sudo\s+(?:-\S+\s+)*)?(?:ba|z|k)?sh\b", re.IGNORECASE)),
+    (
+        "remote script piped into a shell",
+        re.compile(
+            r"\b(?:curl|wget|fetch)\b[^\n|;]*\|\s*"
+            r"(?:(?:['\"]?(?:/(?:[A-Za-z0-9._+-]+/)+)?(?:env|command)\b['\"]?)\s+)?"
+            r"(?:sudo\s+(?:-\S+\s+)*)?"
+            r"['\"]?(?:/(?:[A-Za-z0-9._+-]+/)+)?(?:ba|z|k)?sh\b['\"]?",
+            re.IGNORECASE,
+        ),
+    ),
     ("remote script sourced from a shell", re.compile(r"\b(?:source|\.)\s*<\(\s*(?:curl|wget|fetch)\b", re.IGNORECASE)),
     ("remote script evaluated by a shell", re.compile(r"\beval\s+(?:['\"])?\$\(\s*(?:curl|wget|fetch)\b", re.IGNORECASE)),
     ("recursive force-remove of a root or home path", re.compile(r"\b(?:sudo\s+)?rm\b(?=[^\n]*(?:--(?:recursive|force)\b|-[A-Za-z]*[rf][A-Za-z]*))[^\n]*?(?:['\"]?(?:/|~|\$HOME|\$\{HOME\})['\"]?)(?:[\s/]|$)", re.IGNORECASE)),
@@ -1922,6 +1931,66 @@ def dangerous_patterns_for_language(language: str) -> List[Tuple[str, re.Pattern
     return DANGEROUS_COMMAND_PATTERNS
 
 
+def shell_match_starts_in_executable_context(text: str, offset: int) -> bool:
+    """Distinguish live shell syntax from inert quoted examples/comments.
+
+    This is deliberately bounded to the line prefix and the match's starting
+    token. Quotes around a later command target therefore remain visible to
+    the dangerous-command pattern. Known ``sh -c``/``eval`` string payloads
+    remain executable contexts rather than becoming a quoting bypass.
+    """
+    line_start = text.rfind("\n", 0, offset) + 1
+    prefix = text[line_start:offset]
+    quote: Optional[str] = None
+    quote_start: Optional[int] = None
+    escaped = False
+    for index, character in enumerate(prefix):
+        if escaped:
+            escaped = False
+            continue
+        if quote == "'":
+            if character == "'":
+                quote = None
+                quote_start = None
+            continue
+        if character == "\\":
+            escaped = True
+            continue
+        if quote == '"':
+            if character == '"':
+                quote = None
+                quote_start = None
+            continue
+        if character in {"'", '"'}:
+            quote = character
+            quote_start = index
+            continue
+        if character == "#" and (
+            index == 0
+            or prefix[index - 1].isspace()
+            or prefix[index - 1] in ";|&()"
+        ):
+            return False
+
+    if quote is None:
+        return True
+    assert quote_start is not None
+    quoted_prefix = prefix[quote_start + 1:]
+    if quote == '"' and (
+        re.search(r"(?<!\\)\$\(", quoted_prefix)
+        or re.search(r"(?<!\\)`", quoted_prefix)
+    ):
+        return True
+    before_quote = prefix[:quote_start].rstrip()
+    return bool(
+        re.search(
+            r"(?:['\"]?(?:/(?:[A-Za-z0-9._+-]+/)+)?(?:ba|z|k)?sh['\"]?\s+-c|\beval)\s*$",
+            before_quote,
+            re.IGNORECASE,
+        )
+    )
+
+
 def scan_dangerous_commands(
     files: List[Path],
     root: Path,
@@ -1955,7 +2024,18 @@ def scan_dangerous_commands(
             continue
         assert language is not None
         for label, pattern in dangerous_patterns_for_language(language):
-            if pattern.search(text):
+            match = next(
+                (
+                    candidate
+                    for candidate in pattern.finditer(text)
+                    if language != "shell"
+                    or shell_match_starts_in_executable_context(
+                        text, candidate.start()
+                    )
+                ),
+                None,
+            )
+            if match is not None:
                 location = " outside the detected skill root" if outside_root else ""
                 findings.append(finding("error", f"script_dangerous_command{'_outside_root' if outside_root else ''}", f"bundled executable script{location} contains a potentially destructive command ({label}); review before running", file=display_rel, risk=label, pattern=pattern.pattern, language=language))
                 break

@@ -362,6 +362,13 @@ Secret detection is heuristic and non-exhaustive. It scans common text/config fo
 
 Dangerous-command scanning is heuristic, non-exhaustive, and inspects bundled shell scripts (including `.command` and `.ksh`), PowerShell (`.ps1`, `.psm1`, `.psd1`), Windows batch (`.bat`, `.cmd`), Python, and JavaScript/TypeScript files. Documentation is not command-scanned merely for mentioning these commands. High-confidence matches inside or outside the detected Skill root are errors. A clean scan is not proof that a package is safe to run.
 
+For remote-content shell pipelines, the scanner recognizes supported bare
+shell targets, quoted or unquoted absolute shell paths, and bare or absolute
+`env`/`command` wrappers. A downloader token that begins inside a shell string
+literal or after a shell comment marker is treated as inert evidence, except
+for known shell `-c`, command-substitution, backtick, and `eval`
+string-execution contexts.
+
 ### Complete Machine-Checked Finding Catalog
 
 This is the complete documented set of finding codes. The inspector rejects an
