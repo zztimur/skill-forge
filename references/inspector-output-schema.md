@@ -38,8 +38,8 @@ The inspector is deterministic evidence collection, not the full audit. Always c
 | `name_valid_hyphen_case` | Boolean check for lowercase hyphen-case Skill name. |
 | `description_length` | Character count of the frontmatter description. |
 | `top_level_resources` | Top-level resource folders/files such as `scripts`, `references`, `assets`, and platform metadata folders such as `agents`. |
-| `resource_references` | Referenced `scripts/`, `references/`, and `assets/` paths split into `existing` and `missing`. |
-| `orphaned_resource_candidates` | Resource files not referenced from `SKILL.md`. These are candidates for manual review, not automatic failures. |
+| `resource_references` | Referenced `scripts/`, `references/`, and `assets/` paths split into `existing`, `missing`, and `unsafe`; `source_only` records the reserved Skill Forge source-only script annotation. |
+| `orphaned_resource_candidates` | Resource files not referenced from `SKILL.md` or declared source-only. These are candidates for manual review, not automatic failures. |
 | `template_marker_findings` | Files containing placeholder-like markers such as TODO or example-template text, with file and regex-pattern evidence. |
 | `template_leftover_findings` | Warning findings derived from placeholder/template markers, using normal severity/code finding fields. |
 | `secret_scan_note` | Reminder that secret scanning is heuristic and non-exhaustive. Eligible BOM-marked UTF-8, UTF-16, and UTF-32 text is decoded before matching so alternate Unicode encodings do not silently bypass the scan. |

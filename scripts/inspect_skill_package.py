@@ -105,6 +105,15 @@ HIGH_CONFIDENCE_PII_PATTERNS = (
     re.compile(r"(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)"),
 )
 RESOURCE_REF_PATTERN = re.compile(r"`((?:scripts|references|assets)/[^`\s]+)`|\]\(((?:scripts|references|assets)/[^)\s]+)\)")
+# This reserved, self-scoped annotation documents repository-only helpers
+# without turning them into runtime resource requirements. It deliberately
+# uses an HTML comment rather than a normal Markdown resource link, so release
+# archives may omit the named files. Only a validated Skill Forge package may
+# use it; generic Skills retain the ordinary resource-reference rules.
+SOURCE_ONLY_DECLARATION_PATTERN = re.compile(
+    r"<!--\s*skill-forge:source-only(?:\s+(.*?))?\s*-->",
+    re.IGNORECASE | re.DOTALL,
+)
 SHELL_SCRIPT_EXTENSIONS = {".bash", ".command", ".ksh", ".sh", ".zsh"}
 POWERSHELL_SCRIPT_EXTENSIONS = {".ps1", ".psm1", ".psd1"}
 WINDOWS_BATCH_EXTENSIONS = {".bat", ".cmd"}
@@ -2184,7 +2193,12 @@ def strip_code_fences(text: str) -> str:
     return "\n".join(out)
 
 
-def referenced_resources(skill_text: str, skill_root: Path) -> Dict[str, Any]:
+def referenced_resources(
+    skill_text: str,
+    skill_root: Path,
+    *,
+    declared_skill_name: Optional[str] = None,
+) -> Dict[str, Any]:
     refs: List[str] = []
     for match in RESOURCE_REF_PATTERN.finditer(strip_code_fences(skill_text)):
         value = match.group(1) or match.group(2)
@@ -2200,6 +2214,7 @@ def referenced_resources(skill_text: str, skill_root: Path) -> Dict[str, Any]:
     missing: List[str] = []
     unsafe: List[str] = []
     unsafe_reasons: Dict[str, str] = {}
+    source_only: List[str] = []
     try:
         resolved_root = skill_root.resolve()
     except OSError:
@@ -2235,7 +2250,61 @@ def referenced_resources(skill_text: str, skill_root: Path) -> Dict[str, Any]:
         except OSError as exc:
             unsafe.append(ref)
             unsafe_reasons[ref] = f"resource reference could not be inspected safely: {exc}"
-    return {"existing": existing, "missing": missing, "unsafe": unsafe, "unsafe_reasons": unsafe_reasons}
+
+    # A Skill Forge source checkout has a few repository-maintenance helpers
+    # that are deliberately excluded from its installable runtime. Keep their
+    # declaration distinct from ordinary Markdown resource references: this
+    # preserves strict missing-reference checks for every normal resource while
+    # preventing direct-source orphan guidance from flagging known tooling.
+    if declared_skill_name == "skill-forge":
+        for match in SOURCE_ONLY_DECLARATION_PATTERN.finditer(strip_code_fences(skill_text)):
+            declared = (match.group(1) or "").split()
+            if not declared:
+                unsafe.append("<source-only declaration>")
+                unsafe_reasons["<source-only declaration>"] = (
+                    "source-only declaration must list one or more safe scripts/ paths"
+                )
+                continue
+            for ref in declared:
+                raw_parts = ref.split("/")
+                path = PurePosixPath(ref)
+                if path.is_absolute():
+                    unsafe.append(ref)
+                    unsafe_reasons[ref] = "source-only declarations must not be absolute"
+                    continue
+                if ".." in raw_parts:
+                    unsafe.append(ref)
+                    unsafe_reasons[ref] = "source-only declarations must not use parent-directory traversal"
+                    continue
+                if (
+                    "\\" in ref
+                    or len(raw_parts) < 2
+                    or raw_parts[0] != "scripts"
+                    or any(part in {"", "."} for part in raw_parts)
+                ):
+                    unsafe.append(ref)
+                    unsafe_reasons[ref] = "source-only declarations must list safe scripts/ paths"
+                    continue
+                candidate = skill_root.joinpath(*raw_parts)
+                try:
+                    resolved_candidate = candidate.resolve(strict=False)
+                except OSError:
+                    unsafe.append(ref)
+                    unsafe_reasons[ref] = "source-only declaration could not be resolved safely"
+                    continue
+                if resolved_candidate != resolved_root and resolved_root not in resolved_candidate.parents:
+                    unsafe.append(ref)
+                    unsafe_reasons[ref] = "source-only declaration resolves outside the skill root"
+                    continue
+                source_only.append(ref)
+
+    return {
+        "existing": sorted(set(existing)),
+        "missing": sorted(set(missing)),
+        "unsafe": sorted(set(unsafe)),
+        "unsafe_reasons": unsafe_reasons,
+        "source_only": sorted(set(source_only)),
+    }
 
 
 def classify_top_level(files: List[Path], skill_root: Path) -> Dict[str, Any]:
@@ -2286,7 +2355,7 @@ def package_size_findings(input_path: Path, root: Optional[Path], folder_total: 
 
 
 def find_orphaned_resource_candidates(files: List[Path], skill_root: Path, refs: Dict[str, List[str]]) -> List[str]:
-    referenced = set(refs.get("existing", []))
+    referenced = set(refs.get("existing", [])) | set(refs.get("source_only", []))
     candidates: List[str] = []
     # Grouped by directory (scripts, references, assets) to preserve output order;
     # within a group, files keep their traversal order.
@@ -2677,7 +2746,13 @@ def inspect(input_path: Path, tree_limit: int = MAX_DEFAULT_TREE_FILES, limits: 
             else:
                 existing["unscanned_paths"] = combined_unscanned
         main_skill = root / "SKILL.md"
-        resource_refs: Dict[str, Any] = {"existing": [], "missing": [], "unsafe": [], "unsafe_reasons": {}}
+        resource_refs: Dict[str, Any] = {
+            "existing": [],
+            "missing": [],
+            "unsafe": [],
+            "unsafe_reasons": {},
+            "source_only": [],
+        }
         declared_skill_name: Optional[str] = None
         if main_skill.exists() and not main_skill.is_symlink():
             # These control-plane manifests must never be parsed from a silent
@@ -2714,7 +2789,11 @@ def inspect(input_path: Path, tree_limit: int = MAX_DEFAULT_TREE_FILES, limits: 
                 result["description_length"] = frontmatter_summary["description_length"]
             else:
                 result["frontmatter_validation_findings"] = [finding("error", "frontmatter_missing_or_invalid", fm_error or "frontmatter missing or invalid")]
-            resource_refs = referenced_resources(text, root)
+            resource_refs = referenced_resources(
+                text,
+                root,
+                declared_skill_name=declared_skill_name,
+            )
             result["resource_references"] = resource_refs
         else:
             result["frontmatter_error"] = "no root SKILL.md found"

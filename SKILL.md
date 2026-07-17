@@ -146,9 +146,8 @@ Agent-invoked runtime tools: `scripts/inspect_skill_package.py`,
 `scripts/package_skill.py`, `scripts/run_self_tests.py`, and
 `scripts/validate_audit_contract.py`. Imported runtime modules:
 `scripts/portable_zip_paths.py` and `scripts/runtime_manifest.py`. Source-only
-maintenance scripts: `scripts/generate_release_notes.py`,
-`scripts/release_metadata.py`, `scripts/release_skill.py`,
-`scripts/run_source_tests.py`, and `scripts/verify_independent_evaluator.py`.
+maintenance is declared below.
+<!-- skill-forge:source-only scripts/generate_release_notes.py scripts/release_metadata.py scripts/release_skill.py scripts/run_source_tests.py scripts/verify_independent_evaluator.py -->
 
 When maintaining this Skill, run contract and source tests. Authorized Release
 work builds from a commit, source-proves and extracts the archive, then runs its

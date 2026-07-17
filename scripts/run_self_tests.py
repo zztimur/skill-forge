@@ -1829,6 +1829,46 @@ def build_missing_resource_reference_skill(tmp: Path) -> Path:
     return skill
 
 
+def build_source_only_declaration_skill(tmp: Path) -> Path:
+    """A Skill Forge source tree may declare unshipped maintenance helpers."""
+    skill = write_valid_skill(tmp, "skill-forge")
+    scripts = skill / "scripts"
+    scripts.mkdir()
+    (scripts / "source-only-helper.py").write_text(
+        "#!/usr/bin/env python3\nprint('source-only fixture')\n",
+        encoding="utf-8",
+    )
+    skill_md = skill / "SKILL.md"
+    skill_md.write_text(
+        skill_md.read_text(encoding="utf-8")
+        + "\n<!-- skill-forge:source-only scripts/source-only-helper.py -->\n",
+        encoding="utf-8",
+    )
+    return skill
+
+
+def build_source_only_declaration_zip(tmp: Path) -> Path:
+    """The runtime ZIP deliberately omits its declared source-only helper."""
+    skill = build_source_only_declaration_skill(tmp)
+    target = tmp / "source-only-declaration.zip"
+    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(skill.rglob("*")):
+            if path.is_file() and path.name != "source-only-helper.py":
+                archive.write(path, path.relative_to(skill.parent).as_posix())
+    return target
+
+
+def build_unsafe_source_only_declaration_skill(tmp: Path) -> Path:
+    skill = write_valid_skill(tmp, "skill-forge")
+    skill_md = skill / "SKILL.md"
+    skill_md.write_text(
+        skill_md.read_text(encoding="utf-8")
+        + "\n<!-- skill-forge:source-only scripts/../../outside.py -->\n",
+        encoding="utf-8",
+    )
+    return skill
+
+
 def build_escaping_resource_reference_skill(tmp: Path) -> Path:
     """The outside file deliberately exists, proving an escaping reference is
     rejected rather than classified as a valid bundled resource."""
@@ -2321,6 +2361,30 @@ def check_documented_command_refs(data: dict[str, Any]) -> tuple[bool, str]:
         return False, "documented command flags produced missing_resource_reference"
     if data.get("orphaned_resource_candidates"):
         return False, f"real script wrongly flagged as orphaned: {data.get('orphaned_resource_candidates')!r}"
+    return True, ""
+
+
+def check_source_only_declaration(data: dict[str, Any]) -> tuple[bool, str]:
+    refs = data.get("resource_references", {})
+    expected = ["scripts/source-only-helper.py"]
+    if refs.get("source_only") != expected:
+        return False, f"expected source-only declaration {expected!r}, got {refs!r}"
+    if refs.get("missing") or refs.get("unsafe"):
+        return False, f"source-only declaration changed ordinary resource status: {refs!r}"
+    if "scripts/source-only-helper.py" in data.get("orphaned_resource_candidates", []):
+        return False, "declared source-only helper was incorrectly reported as orphaned"
+    if has_code(data, "missing_resource_reference"):
+        return False, "source-only declaration produced missing_resource_reference"
+    return True, ""
+
+
+def check_unsafe_source_only_declaration(data: dict[str, Any]) -> tuple[bool, str]:
+    refs = data.get("resource_references", {})
+    unsafe = "scripts/../../outside.py"
+    if unsafe not in refs.get("unsafe", []):
+        return False, f"unsafe source-only declaration was accepted: {refs!r}"
+    if not has_code(data, "resource_reference_outside_root"):
+        return False, "unsafe source-only declaration did not fail closed"
     return True, ""
 
 
@@ -4260,6 +4324,9 @@ def main() -> int:
         TestCase("OpenAI accepts safe existing icon asset", build_openai_safe_icon_skill, 0, checker=check_openai_metadata_clean, extra_args=("--target", "openai")),
         TestCase("OpenAI rejects unsafe icon path", build_openai_unsafe_icon_skill, 2, "openai_metadata_icon_path_invalid", expected_severity="error"),
         TestCase("missing referenced resource", build_missing_resource_reference_skill, 2, "missing_resource_reference", expected_severity="error"),
+        TestCase("source checkout source-only declaration suppresses only orphan guidance", build_source_only_declaration_skill, 0, checker=check_source_only_declaration),
+        TestCase("runtime ZIP accepts an omitted declared source-only helper", build_source_only_declaration_zip, 0, checker=check_source_only_declaration),
+        TestCase("unsafe source-only declaration fails closed", build_unsafe_source_only_declaration_skill, 2, "resource_reference_outside_root", checker=check_unsafe_source_only_declaration, expected_severity="error"),
         TestCase("escaping resource reference", build_escaping_resource_reference_skill, 2, "resource_reference_outside_root", checker=check_escaping_resource_reference, expected_severity="error"),
         TestCase(".env.* variant secret", build_env_variant_secret_skill, 2, "secret_openai_api_key", checker=check_env_variant_secret),
         TestCase("private key block content", build_private_key_block_skill, 2, "secret_private_key_block", expected_severity="error"),
