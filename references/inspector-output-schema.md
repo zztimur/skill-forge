@@ -134,9 +134,9 @@ The inspector uses conservative defaults for normal Skill audits and includes th
 | `--max-zip-uncompressed-bytes` | `max_zip_uncompressed_bytes` | `104857600` | Maximum total uncompressed ZIP bytes. |
 | `--max-zip-member-bytes` | `max_zip_member_bytes` | `26214400` | Maximum uncompressed bytes for one ZIP member. |
 | `--max-directory-files` | `max_directory_files` | `1000` | Maximum files in a direct folder input. |
-| `--max-directory-entries` | `max_directory_entries` | `10000` | Maximum total directory entries in a direct folder input. |
+| `--max-directory-entries` | `max_directory_entries` | `5000` | Maximum total directory entries in a direct folder input. |
 | `--max-directory-depth` | `max_directory_depth` | `32` | Maximum directory nesting depth in a direct folder input. |
-| `--max-directory-entries-per-directory` | `max_directory_entries_per_directory` | `2000` | Maximum entries in any one direct-input directory. |
+| `--max-directory-entries-per-directory` | `max_directory_entries_per_directory` | `1000` | Maximum entries in any one direct-input directory. |
 | `--max-directory-total-bytes` | `max_directory_total_bytes` | `104857600` | Maximum total bytes in a direct folder input. |
 | `--max-directory-file-bytes` | `max_directory_file_bytes` | `26214400` | Maximum bytes for one direct-folder file. |
 | `--max-compression-ratio` | `max_compression_ratio` | `100.0` | Maximum allowed ZIP member compression ratio. It applies to every non-empty member; finite positive values only. |
@@ -462,9 +462,9 @@ their meaning.
     "max_zip_uncompressed_bytes": 104857600,
     "max_zip_member_bytes": 26214400,
     "max_directory_files": 1000,
-    "max_directory_entries": 10000,
+    "max_directory_entries": 5000,
     "max_directory_depth": 32,
-    "max_directory_entries_per_directory": 2000,
+    "max_directory_entries_per_directory": 1000,
     "max_directory_total_bytes": 104857600,
     "max_directory_file_bytes": 26214400,
     "max_compression_ratio": 100.0,

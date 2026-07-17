@@ -145,7 +145,14 @@ For skill packages, include cases such as:
 - `--strict` exit behavior for structural errors, unsafe archives/directories, and high-confidence secret findings.
 - for Skill Forge releases, a committed runtime-only archive that has the expected root folder, excludes repo-only paths, and passes strict inspection for Portable and OpenAI.
 
-Confirm scripts fail safely and produce actionable diagnostics. If the evaluated skill is Skill Forge itself, run `scripts/run_self_tests.py` and report the pass/fail summary in addition to manual simulations.
+Confirm scripts fail safely and produce actionable diagnostics. Treat target
+self-tests as untrusted: after purpose and provenance review, run them only with
+copied or synthetic inputs, network default-deny, credentials absent, source
+read-only, scratch-only writes, bounded process/time/memory, and external side
+effects forbidden. If any control is unavailable, do not execute; required
+evidence is Not Assessed. When the evaluated skill is Skill Forge itself and
+all controls are verified, run `scripts/run_self_tests.py` and report the
+pass/fail summary in addition to manual simulations.
 
 ## Simulation Standard
 

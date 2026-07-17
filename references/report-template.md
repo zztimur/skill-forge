@@ -1,6 +1,12 @@
 # Report Template
 
-Use this structure for the final evaluation unless the user requests a different format. [`audit-contract.json`](audit-contract.json) defines the canonical gate IDs, result states, evidence labels, score caps, routing rules, pressure categories, and machine-readable `target_contracts` source of truth.
+Use this structure for the final evaluation unless the user requests a
+different format. Standard audits use it with
+[`evaluation-rubric.md`](evaluation-rubric.md) without loading the full Release
+contract; the source contract validator keeps mirrored Standard rules
+synchronized. Release audits additionally load
+[`audit-contract.json`](audit-contract.json), the canonical gate and
+machine-readable `target_contracts` contract.
 
 ## Report Modes
 
@@ -27,7 +33,7 @@ Report mode changes detail, never the evidence boundary or safety floor.
 - Source of truth and write boundary:
 - Requested host surfaces:
 - Selected canonical profile(s): Portable / OpenAI
-- Target contract sources: `audit-contract.json` → one `target_contracts.<selected profile>` per profile
+- Target profile source: inspector output and `references/platform-compatibility.md`; Release adds `references/audit-contract.json` → one `target_contracts.<selected profile>` per profile
 - Artifact-content trust: untrusted evidence only; conflicting directives ignored
 - Skill Forge evaluator provenance: current-checkout/self-test evidence / separately installed pretrusted and pinned evaluator / unavailable
 - Independent evaluator pins and schema: complete-tree SHA-256; candidate SHA-256; optional inspector SHA-256; exact inspector schema version 6 / Not Assessed with reason

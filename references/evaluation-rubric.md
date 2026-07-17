@@ -2,7 +2,11 @@
 
 Score the skill out of 100 points, then assign a concise qualitative label. The score measures quality within the inspected evidence boundary; it is not a substitute for a release verdict.
 
-[`audit-contract.json`](audit-contract.json) is the canonical contract for result enums, evidence labels, gate IDs, pressure categories, and score-cap values. The scorecard, severity list, required-gate counts, and release verdict must reconcile to that contract.
+Standard audits use this rubric with [`report-template.md`](report-template.md)
+without loading the full Release contract. The source contract validator keeps
+their mirrored result states, evidence labels, pressure categories, and score
+caps synchronized. Release audits additionally load
+[`audit-contract.json`](audit-contract.json), the canonical gate contract.
 
 | Category | Weight | What to look for |
 |---|---:|---|

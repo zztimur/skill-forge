@@ -8,6 +8,7 @@ dependency-free and use fake secrets only.
 
 from __future__ import annotations
 
+import ast
 import json
 import importlib.util
 import hashlib
@@ -3671,6 +3672,30 @@ def run_audit_contract_consistency_regression_case() -> dict[str, Any]:
             1,
         )
         validator.validate_example_safety_consistency(contradictory_safety, safety_issues)
+
+        inspector_path = CONTRACT_VALIDATOR.parent / "inspect_skill_package.py"
+        schema_path = CONTRACT_VALIDATOR.parent.parent / "references" / "inspector-output-schema.md"
+        inspector_tree = ast.parse(inspector_path.read_text(encoding="utf-8"))
+        schema = schema_path.read_text(encoding="utf-8")
+        stale_limit_issues: list[str] = []
+        validator.validate_inspector_policy_documentation(
+            inspector_tree,
+            schema.replace(
+                "| `--max-directory-entries` | `max_directory_entries` | `5000` |",
+                "| `--max-directory-entries` | `max_directory_entries` | `5001` |",
+                1,
+            ),
+            example,
+            stale_limit_issues,
+        )
+        secret_note = validator.assignment_value(inspector_tree, "SECRET_SCAN_NOTE")
+        stale_note_issues: list[str] = []
+        validator.validate_inspector_policy_documentation(
+            inspector_tree,
+            schema,
+            example.replace(secret_note, "stale secret scan note", 1),
+            stale_note_issues,
+        )
         ok = (
             any("duplicate gate rows" in issue for issue in duplicate)
             and any("malformed gate row" in issue for issue in malformed)
@@ -3679,11 +3704,14 @@ def run_audit_contract_consistency_regression_case() -> dict[str, Any]:
             and any("executive result" in issue for issue in rollup_issues)
             and any("release gate verdict" in issue for issue in release_verdict_issues)
             and any("cannot claim no safety/privacy concerns" in issue for issue in safety_issues)
+            and any("MAX_DIRECTORY_ENTRIES=5000" in issue for issue in stale_limit_issues)
+            and any("exact current SECRET_SCAN_NOTE" in issue for issue in stale_note_issues)
         )
         reason = "" if ok else (
             f"duplicate={duplicate!r}; malformed={malformed!r}; extra={extra!r}; "
             f"reordered={reordered!r}; rollup={rollup_issues!r}; "
-            f"release={release_verdict_issues!r}; safety={safety_issues!r}"
+            f"release={release_verdict_issues!r}; safety={safety_issues!r}; "
+            f"limits={stale_limit_issues!r}; secret_note={stale_note_issues!r}"
         )
     except Exception as exc:
         ok = False

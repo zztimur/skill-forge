@@ -41,6 +41,12 @@ ZIP_STREAM_CHUNK_BYTES = 1024 * 1024
 TEXT_SNIFF_BYTES = 8192
 MAX_YAML_NESTING_DEPTH = 64
 MAX_YAML_INTEGER_DIGITS = 4096
+SECRET_SCAN_NOTE = (
+    "secret scanning is heuristic and non-exhaustive; it scans known text/config formats and "
+    "regular files that pass bounded content sniffing. Eligible files are read completely "
+    "within package safety limits unless --max-safety-scan-bytes explicitly requests "
+    "exploratory partial scanning."
+)
 PORTABLE_FRONTMATTER_KEYS = {"name", "description"}
 # These preserve the previous portable profile: fields are allowed because at
 # least one supported surface understands them, but are surfaced for review.
@@ -2639,7 +2645,7 @@ def inspect(input_path: Path, tree_limit: int = MAX_DEFAULT_TREE_FILES, limits: 
         secret_scan = scan_secret_risks(root_files, root, limits.max_safety_scan_bytes)
         secret_scan.extend(scan_secret_risks_outside_detected_root(base_path, root, limits.max_safety_scan_bytes, preflight.entries))
         result["secret_risk_findings"] = secret_scan.findings
-        result["secret_scan_note"] = "secret scanning is heuristic and non-exhaustive; it scans known text/config formats and regular files that pass bounded content sniffing. Eligible files are read completely within package safety limits unless --max-safety-scan-bytes explicitly requests exploratory partial scanning."
+        result["secret_scan_note"] = SECRET_SCAN_NOTE
         outside_files = [
             path for path in entries_outside_detected_root(base_path, root, preflight.entries)
             if is_regular_file(path)

@@ -113,22 +113,43 @@ previously verified archive, or another independent evaluator. Record the
 source and limitation; never upgrade this target's own passing tests to an
 independent release pass.
 
-## Reference-Loading Map
+## Resource Routing
 
-Load references only when their decision is needed:
+### Agent-loaded references
 
-- `input-routing.md` and `artifact-and-mode-matrix.md`: ambiguity, mutation,
-  packaging, installed runtimes, portfolios, or releases.
-- `inspector-output-schema.md`: inspector JSON, limits, findings, or strictness.
-- `validator-evidence.md`: official validators, self-tests, or independent evidence.
-- `pressure-test-suite.md`, `severity-framework.md`, and
-  `evaluation-rubric.md`: Standard or Release behavioral review, severity, or
-  scoring.
-- `report-template.md`: Standard/Release structure; `example-report.md` for an example.
-- `audit-contract.json` and `release-gate-checklist.md`: Release only.
-- `platform-compatibility.md`: target-specific compatibility questions.
-- `runtime-manifest-schema.md`: Skill Forge packaging, archive integrity, or source proof.
+Load only when needed: `references/input-routing.md` and
+`references/artifact-and-mode-matrix.md` for ambiguity, mutation, packaging,
+installed runtimes, portfolios, or releases;
+`references/inspector-output-schema.md` for inspector output;
+`references/validator-evidence.md` for validator/self-test provenance;
+`references/pressure-test-suite.md`, `references/severity-framework.md`, and
+`references/evaluation-rubric.md` for Standard behavior, severity, and scoring;
+`references/report-template.md` for Standard structure; and
+`references/platform-compatibility.md` for target questions. Standard does not
+require the full Release contract; source contract validation keeps mirrored
+rules synchronized.
 
-When maintaining this Skill, run the contract validator and source tests. For
-authorized packaging or release work, build from a commit, source-prove and
-extract the archive, then run its packaged runtime tests.
+### Release-only references
+
+Release loads `references/audit-contract.json`,
+`references/release-gate-checklist.md`, and
+`references/runtime-manifest-schema.md`.
+
+### Human-only references
+
+`references/audit-checklist.md` aids maintainers;
+`references/example-report.md` is illustrative. Neither is agent-required.
+
+### Script roles
+
+Agent-invoked runtime tools: `scripts/inspect_skill_package.py`,
+`scripts/package_skill.py`, `scripts/run_self_tests.py`, and
+`scripts/validate_audit_contract.py`. Imported runtime modules:
+`scripts/portable_zip_paths.py` and `scripts/runtime_manifest.py`. Source-only
+maintenance scripts: `scripts/generate_release_notes.py`,
+`scripts/release_metadata.py`, `scripts/release_skill.py`,
+`scripts/run_source_tests.py`, and `scripts/verify_independent_evaluator.py`.
+
+When maintaining this Skill, run contract and source tests. Authorized Release
+work builds from a commit, source-proves and extracts the archive, then runs its
+packaged runtime tests.

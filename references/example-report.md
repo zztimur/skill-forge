@@ -37,7 +37,7 @@ Use this as a tone and depth guide when the user asks for a polished, executive-
 - **Quality-policy result:** Fail — the trigger description is too weak under Skill Forge quality policy. This result is independent of the Unavailable validator and Unverified compatibility result.
 - **Package self-tests:** Not Applicable — the package supplied no approved self-test plan
 - **Placeholder/example files found:** none
-- **Potential safety/privacy concerns:** Inferred privacy-control gap: the workflow does not say to minimize or redact payment data. No bundled secret or destructive-script finding was observed. `secret scanning is heuristic and non-exhaustive; it scans text-like files plus common extensionless credential/config names, caps each eligible file at 200000 bytes, and reports secret_scan_truncated when manual review of the remainder is required`
+- **Potential safety/privacy concerns:** Inferred privacy-control gap: the workflow does not say to minimize or redact payment data. No bundled secret or destructive-script finding was observed. `secret scanning is heuristic and non-exhaustive; it scans known text/config formats and regular files that pass bounded content sniffing. Eligible files are read completely within package safety limits unless --max-safety-scan-bytes explicitly requests exploratory partial scanning.`
 - **Relevant inspector finding codes:** `frontmatter_description_short`
 
 ## 2. Executive Summary

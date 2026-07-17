@@ -31,6 +31,9 @@ VALIDATOR_EVIDENCE_PATH = REPO_ROOT / "references" / "validator-evidence.md"
 INSPECTOR_SCHEMA_PATH = REPO_ROOT / "references" / "inspector-output-schema.md"
 INSPECTOR_PATH = REPO_ROOT / "scripts" / "inspect_skill_package.py"
 SKILL_PATH = REPO_ROOT / "SKILL.md"
+README_PATH = REPO_ROOT / "README.md"
+AUDIT_CHECKLIST_PATH = REPO_ROOT / "references" / "audit-checklist.md"
+OPENAI_METADATA_PATH = REPO_ROOT / "agents" / "openai.yaml"
 
 EXPECTED_RESULTS = ["Pass", "Fail", "Partial", "Not Assessed", "Not Applicable"]
 EXPECTED_EVIDENCE = ["Verified", "Inferred", "Unverified"]
@@ -106,11 +109,35 @@ EXPECTED_RELEASE_VERDICT_ROLLUP = {
     "ignored_gate_result": "Not Applicable",
     "all_not_applicable_result": "Not Assessed",
 }
-EXAMPLE_SECRET_NOTE = (
-    "secret scanning is heuristic and non-exhaustive; it scans text-like files plus common "
-    "extensionless credential/config names, caps each eligible file at 200000 bytes, and "
-    "reports secret_scan_truncated when manual review of the remainder is required"
-)
+INSPECTOR_DIRECTORY_DEFAULTS = {
+    "--max-directory-entries": ("MAX_DIRECTORY_ENTRIES", "max_directory_entries"),
+    "--max-directory-entries-per-directory": (
+        "MAX_DIRECTORY_ENTRIES_PER_DIRECTORY",
+        "max_directory_entries_per_directory",
+    ),
+}
+EXPECTED_REFERENCE_ROLES = {
+    "### Agent-loaded references": {
+        "references/artifact-and-mode-matrix.md",
+        "references/evaluation-rubric.md",
+        "references/input-routing.md",
+        "references/inspector-output-schema.md",
+        "references/platform-compatibility.md",
+        "references/pressure-test-suite.md",
+        "references/report-template.md",
+        "references/severity-framework.md",
+        "references/validator-evidence.md",
+    },
+    "### Release-only references": {
+        "references/audit-contract.json",
+        "references/release-gate-checklist.md",
+        "references/runtime-manifest-schema.md",
+    },
+    "### Human-only references": {
+        "references/audit-checklist.md",
+        "references/example-report.md",
+    },
+}
 EXPECTED_EXECUTIVE_ROLLUP = {
     "precedence": ["Fail", "Not Assessed", "Partial", "Pass"],
     "ignore_not_applicable_when_any_applicable": True,
@@ -890,6 +917,45 @@ def markdown_codes(region: str) -> List[str]:
     return re.findall(r"`([a-z][a-z0-9_]+)`", region)
 
 
+def validate_inspector_policy_documentation(
+    tree: ast.AST,
+    schema: str,
+    example_report: str,
+    issues: List[str],
+) -> None:
+    """Bind documented safety defaults and notes to inspector source literals."""
+    limits_region = marked_region(schema, LIMITS_TABLE_START, LIMITS_TABLE_END, "limits table", issues)
+    documented_defaults = {
+        flag: value
+        for flag, value in re.findall(
+            r"^\|\s*`(--[a-z0-9-]+)`\s*\|[^|]*\|\s*`([^`]+)`\s*\|",
+            limits_region,
+            re.MULTILINE,
+        )
+    }
+    for flag, (constant_name, _field_name) in INSPECTOR_DIRECTORY_DEFAULTS.items():
+        try:
+            expected = str(assignment_value(tree, constant_name))
+        except ValueError as exc:
+            issues.append(f"could not read inspector default for {flag}: {exc}")
+            continue
+        actual = documented_defaults.get(flag)
+        if actual != expected:
+            issues.append(
+                f"inspector schema default for {flag} must match {constant_name}={expected}; found {actual!r}"
+            )
+
+    try:
+        secret_note = assignment_value(tree, "SECRET_SCAN_NOTE")
+    except ValueError as exc:
+        issues.append(f"could not read inspector secret-scan note: {exc}")
+        return
+    if not isinstance(secret_note, str) or not secret_note:
+        issues.append("SECRET_SCAN_NOTE must be a non-empty string literal")
+    elif secret_note not in example_report:
+        issues.append("example report must include the inspector's exact current SECRET_SCAN_NOTE")
+
+
 def minimal_success_example(schema: str, issues: List[str]) -> Mapping[str, Any]:
     section = schema.split("## Minimal Successful Output Example", 1)
     if len(section) != 2:
@@ -914,7 +980,8 @@ def validate_inspector_documentation(issues: List[str]) -> None:
     """Keep inspector code, JSON examples, limits, and finding docs synchronized."""
     inspector_source = read_text(INSPECTOR_PATH, issues)
     schema = read_text(INSPECTOR_SCHEMA_PATH, issues)
-    if not inspector_source or not schema:
+    example_report = read_text(EXAMPLE_PATH, issues)
+    if not inspector_source or not schema or not example_report:
         return
     try:
         tree = ast.parse(inspector_source)
@@ -958,6 +1025,7 @@ def validate_inspector_documentation(issues: List[str]) -> None:
         issues.append(f"inspector schema is missing CLI safety-limit docs: {', '.join(missing_flags)}")
     if stale_flags:
         issues.append(f"inspector schema documents retired CLI safety limits: {', '.join(stale_flags)}")
+    validate_inspector_policy_documentation(tree, schema, example_report, issues)
 
     effective_region = marked_region(schema, EFFECTIVE_LIMITS_START, EFFECTIVE_LIMITS_END, "effective-limits", issues)
     documented_effective_fields = set(markdown_codes(effective_region))
@@ -1030,6 +1098,18 @@ def validate_inspector_documentation(issues: List[str]) -> None:
     limits = example.get("effective_limits")
     if not isinstance(limits, dict) or set(effective_fields) - set(limits):
         issues.append("inspector schema minimal successful example must include every active effective_limits field")
+    elif isinstance(limits, dict):
+        for _flag, (constant_name, field_name) in INSPECTOR_DIRECTORY_DEFAULTS.items():
+            try:
+                expected = assignment_value(tree, constant_name)
+            except ValueError as exc:
+                issues.append(f"could not read inspector example default {constant_name}: {exc}")
+                continue
+            if limits.get(field_name) != expected:
+                issues.append(
+                    f"inspector schema minimal successful example {field_name} must match "
+                    f"{constant_name}={expected}"
+                )
 
 
 def validate_skill_control_plane(issues: List[str]) -> None:
@@ -1075,11 +1155,42 @@ def validate_skill_control_plane(issues: List[str]) -> None:
             issues.append(f"SKILL.md is missing required control-plane rule: {marker!r}")
     for marker in (
         "ambiguity, mutation,",
-        "inspector-output-schema.md",
-        "Release only",
+        "references/inspector-output-schema.md",
+        "Standard does not\nrequire the full Release contract",
+        "source contract validation keeps mirrored\nrules synchronized",
+        "Release loads `references/audit-contract.json`",
     ):
         if marker not in skill:
             issues.append(f"SKILL.md is missing required conditional reference map rule: {marker!r}")
+    classified: dict[str, str] = {}
+    for heading, expected_paths in EXPECTED_REFERENCE_ROLES.items():
+        parts = skill.split(heading, 1)
+        if len(parts) != 2:
+            issues.append(f"SKILL.md is missing reference role section {heading!r}")
+            continue
+        section = re.split(r"\n###\s+", parts[1], maxsplit=1)[0]
+        actual_paths = set(re.findall(r"`(references/[^`]+)`", section))
+        missing = sorted(expected_paths - actual_paths)
+        unexpected = sorted(actual_paths - expected_paths)
+        if missing:
+            issues.append(f"{heading} is missing classified references: {', '.join(missing)}")
+        if unexpected:
+            issues.append(f"{heading} has references assigned to the wrong role: {', '.join(unexpected)}")
+        for path in actual_paths:
+            if path in classified:
+                issues.append(f"{path} is classified in more than one reference role section")
+            classified[path] = heading
+    shipped_references = {
+        str(path.relative_to(REPO_ROOT))
+        for path in (REPO_ROOT / "references").iterdir()
+        if path.is_file()
+    }
+    unclassified = sorted(shipped_references - set(classified))
+    nonexistent = sorted(set(classified) - shipped_references)
+    if unclassified:
+        issues.append(f"SKILL.md has unclassified shipped references: {', '.join(unclassified)}")
+    if nonexistent:
+        issues.append(f"SKILL.md classifies nonexistent references: {', '.join(nonexistent)}")
     if "11/10" in skill:
         issues.append("SKILL.md must not advertise an 11/10 result")
 
@@ -1095,6 +1206,9 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
         MATRIX_PATH: read_text(MATRIX_PATH, issues),
         PLATFORM_PATH: read_text(PLATFORM_PATH, issues),
         VALIDATOR_EVIDENCE_PATH: read_text(VALIDATOR_EVIDENCE_PATH, issues),
+        README_PATH: read_text(README_PATH, issues),
+        AUDIT_CHECKLIST_PATH: read_text(AUDIT_CHECKLIST_PATH, issues),
+        OPENAI_METADATA_PATH: read_text(OPENAI_METADATA_PATH, issues),
     }
     gates = contract.get("gates") if isinstance(contract.get("gates"), list) else []
     gate_ids = [gate.get("id") for gate in gates if isinstance(gate, dict)]
@@ -1259,8 +1373,6 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
         issues.append("example report must use Portable for a generic/no-host target")
     if "Unknown" in example:
         issues.append("example report must not use Unknown as a generic target profile")
-    if EXAMPLE_SECRET_NOTE not in example:
-        issues.append("example report must include the exact required secret-scan note")
     if "**Validator outcome:** Unavailable" not in example or "**Gate result derived from validator outcome:** Not Applicable" not in example:
         issues.append("example report must map unavailable optional validation to Not Applicable")
     if "**Score cap applied:** 79/100" not in example:
@@ -1317,6 +1429,36 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
         issues.append("example report must reconcile its failed gates to a Fail release verdict")
     if "11/10" in texts[RUBRIC_PATH] or "11/10" in texts[TEMPLATE_PATH]:
         issues.append("rating references must not advertise an 11/10 result")
+
+    sandbox_policy = (
+        "network default-deny, credentials absent, source read-only, scratch-only writes, "
+        "bounded process/time/memory, and external side effects forbidden"
+    )
+    sandbox_fallback = "required evidence is Not Assessed"
+    for document in (README_PATH, AUDIT_CHECKLIST_PATH, PRESSURE_PATH):
+        normalized = re.sub(r"\s+", " ", texts[document])
+        add_if_missing(normalized, sandbox_policy, document, issues)
+        add_if_missing(normalized, sandbox_fallback, document, issues)
+        if "where possible" in texts[document].lower():
+            issues.append(f"{document.relative_to(REPO_ROOT)} must not weaken sandbox controls with 'where possible'")
+
+    standard_release_markers = {
+        RUBRIC_PATH: ("without loading the full Release contract", "source contract validator keeps"),
+        TEMPLATE_PATH: ("without loading the full Release contract", "mirrored Standard rules"),
+        PLATFORM_PATH: ("without loading the full Release contract", "Release audits load"),
+    }
+    for document, markers in standard_release_markers.items():
+        normalized = re.sub(r"\s+", " ", texts[document])
+        for marker in markers:
+            add_if_missing(normalized, marker, document, issues)
+
+    openai_metadata = texts[OPENAI_METADATA_PATH]
+    add_if_missing(
+        openai_metadata,
+        'default_prompt: "Use $skill-forge to run a read-only Standard audit of this Skill package."',
+        OPENAI_METADATA_PATH,
+        issues,
+    )
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:

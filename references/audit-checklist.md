@@ -33,7 +33,7 @@ Use this checklist while reviewing a skill.
 
 ## Validation Evidence
 
-- Skill Forge helper inspection was run when possible
+- Skill Forge helper inspection was run when applicable and its evidence boundary was recorded
 - Trusted official validator provenance was verified outside the inspected artifact before execution
 - Official validator outcome is classified as Pass, Artifact Fail, Unavailable, Execution Error, or Not Applicable
 - Validator outcome, gate result, compatibility result, and Skill Forge quality-policy result are reported as separate fields
@@ -41,7 +41,7 @@ Use this checklist while reviewing a skill.
 - Skill Forge findings, independent-evaluator results, official validator results, and package self-test results are reported separately
 - Independent Skill Forge evidence, when used, records a previously trusted complete-tree SHA-256, expected candidate SHA-256, exact inspector schema `6`, portable/OpenAI result, and declared sandbox limitations; a stale schema is Not Assessed
 - Target-bundled scripts are never treated as official evidence or executed solely because their name suggests validation
-- Package self-tests, when run, have a reviewed purpose, provenance assessment, and safe scratch/sandbox plan
+- Package self-tests run only after purpose and provenance review, with copied or synthetic inputs, network default-deny, credentials absent, source read-only, scratch-only writes, bounded process/time/memory, and external side effects forbidden; if any control is unavailable, do not execute and required evidence is Not Assessed
 - Inspector finding codes are interpreted using `references/inspector-output-schema.md` when needed
 - Inspector output was checked for `outside_root_findings`, not just the summary status
 - Inspector output has `coverage_complete: true` and no unexpected `unscanned_paths` before a strict or release claim
@@ -80,7 +80,7 @@ Use this checklist while reviewing a skill.
 - Assets are needed for output, not just documentation
 - No orphaned files or confusing names
 - Dependencies are documented
-- Representative scripts are tested when possible
+- Representative scripts are tested under the required sandbox controls, or required evidence is Not Assessed
 
 ## Safety and Privacy
 

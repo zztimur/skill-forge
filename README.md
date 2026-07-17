@@ -273,9 +273,11 @@ heuristic and non-exhaustive; a clean result is not proof of safety.
 
 Do not run bundled scripts that appear destructive, credential-harvesting, network-dependent, or unrelated to validation.
 
-Before running any target-bundled self-test, review its purpose and provenance,
-then use a safe scratch plan with copied or synthetic inputs, no network where
-possible, and no credentials or external side effects.
+Before running any target-bundled self-test, review its purpose and provenance
+and use copied or synthetic inputs with network default-deny, credentials
+absent, source read-only, scratch-only writes, bounded process/time/memory, and
+external side effects forbidden. If any control is unavailable, do not run the
+self-test; required evidence is Not Assessed.
 
 Keep `SKILL.md` compact. Move detailed rubrics, examples, schemas, and extended guidance into directly linked files under `references/`.
 

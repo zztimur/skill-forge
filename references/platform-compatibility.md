@@ -17,14 +17,15 @@ resource and safety boundary.
 
 ## Contract source of truth
 
-[`audit-contract.json`](audit-contract.json) is the machine-readable source of
-truth for the two audit target profiles. Each `target_contracts` record carries
-its verification date, source URL, host-verified rule keys, Skill Forge policy
-recommendations, frontmatter expectations, layout rule, and known product upload
-limit. A `null` product limit is an explicit **Not Applicable** host-limit
-result, not permission to treat an internal inspector safety limit as a host
-requirement. A `null` value means no documented product upload limit exists for
-that target in the verified source.
+Standard audits select the two audit target profiles from inspector output and
+this reference without loading the full Release contract. The source contract
+validator keeps these mirrored profile rules synchronized. Release audits load
+[`audit-contract.json`](audit-contract.json); each `target_contracts` record
+carries its verification date, source URL, host-verified rule keys, Skill Forge
+policy recommendations, frontmatter expectations, layout rule, and known
+product upload limit. A `null` product limit is an explicit **Not Applicable**
+host-limit result, not permission to treat an internal inspector safety limit
+as a host requirement.
 
 ## Canonical targets
 
