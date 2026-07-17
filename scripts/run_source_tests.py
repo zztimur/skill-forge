@@ -30,6 +30,7 @@ INDEPENDENT_EVALUATOR = SCRIPT_DIR / "verify_independent_evaluator.py"
 RUNTIME_TESTS = SCRIPT_DIR / "run_self_tests.py"
 RUNTIME_MANIFEST = SCRIPT_DIR / "runtime_manifest.py"
 PACKAGE_TOOL = SCRIPT_DIR / "package_skill.py"
+CONTRACT_VALIDATOR = SCRIPT_DIR / "validate_audit_contract.py"
 
 
 def load_module(path: Path, name: str) -> Any:
@@ -1114,7 +1115,7 @@ def run_independent_evaluator_case() -> dict[str, Any]:
 
 
 def run_runtime_surface_split_case() -> dict[str, Any]:
-    """Prove the packaged runner has no source-only helper dependency."""
+    """Prove runtime/source boundaries stay authoritative and fail closed."""
 
     try:
         runtime_source = RUNTIME_TESTS.read_text(encoding="utf-8")
@@ -1122,6 +1123,9 @@ def run_runtime_surface_split_case() -> dict[str, Any]:
             RUNTIME_MANIFEST, "skill_forge_runtime_manifest_surface_tests"
         )
         package = load_module(PACKAGE_TOOL, "skill_forge_package_surface_tests")
+        validator = load_module(
+            CONTRACT_VALIDATOR, "skill_forge_runtime_boundary_contract_tests"
+        )
         forbidden_runtime_symbols = (
             "RELEASE_TOOL",
             "RELEASE_NOTES",
@@ -1133,34 +1137,62 @@ def run_runtime_surface_split_case() -> dict[str, Any]:
         leaked_symbols = [
             symbol for symbol in forbidden_runtime_symbols if symbol in runtime_source
         ]
-        selectors = set(runtime_manifest.SKILL_FORGE_RUNTIME_SELECTORS)
+        selectors = tuple(runtime_manifest.SKILL_FORGE_RUNTIME_SELECTORS)
+        source_only = tuple(runtime_manifest.SKILL_FORGE_SOURCE_ONLY_SCRIPTS)
+        declaration_issues: list[str] = []
+        declared = validator.source_only_declaration_paths(
+            (SCRIPT_DIR.parent / "SKILL.md").read_text(encoding="utf-8"),
+            declaration_issues,
+        )
+        clean_boundary = runtime_manifest.runtime_boundary_issues(
+            selectors,
+            package.FORBIDDEN_RUNTIME_PATHS,
+            declared,
+        )
+        missing_boundary = runtime_manifest.runtime_boundary_issues(
+            selectors,
+            source_only[:-1],
+            source_only,
+        )
+        extra_boundary = runtime_manifest.runtime_boundary_issues(
+            selectors,
+            source_only,
+            (*source_only, "scripts/unexpected-source-only.py"),
+        )
+        misclassified_boundary = runtime_manifest.runtime_boundary_issues(
+            (*selectors, source_only[0]),
+            source_only,
+            source_only,
+        )
         ok = (
             not leaked_symbols
-            and "scripts/run_source_tests.py" not in selectors
-            and "scripts/run_source_tests.py" in package.FORBIDDEN_RUNTIME_PATHS
-            and "scripts/release_metadata.py" not in selectors
-            and "scripts/release_metadata.py" in package.FORBIDDEN_RUNTIME_PATHS
-            and "scripts/verify_independent_evaluator.py" not in selectors
-            and "scripts/verify_independent_evaluator.py"
-            in package.FORBIDDEN_RUNTIME_PATHS
+            and not declaration_issues
+            and not clean_boundary
+            and any("missing canonical paths" in item for item in missing_boundary)
+            and any("non-canonical paths" in item for item in extra_boundary)
+            and any(
+                "runtime selectors include source-only paths" in item
+                for item in misclassified_boundary
+            )
         )
         reason = (
             ""
             if ok
             else (
-                f"leaked_symbols={leaked_symbols!r}; selectors={sorted(selectors)!r}; "
-                f"forbidden={sorted(package.FORBIDDEN_RUNTIME_PATHS)!r}"
+                f"leaked_symbols={leaked_symbols!r}; declaration={declaration_issues!r}; "
+                f"clean={clean_boundary!r}; missing={missing_boundary!r}; "
+                f"extra={extra_boundary!r}; misclassified={misclassified_boundary!r}"
             )
         )
     except Exception as exc:
         ok = False
         reason = f"runtime/source split check raised {type(exc).__name__}: {exc}"
     return {
-        "name": "runtime self-tests are independent of source-only release tooling",
+        "name": "runtime/source boundary stays centralized and fails closed",
         "fixture": str(RUNTIME_TESTS),
         "expected_exit": 0,
         "actual_exit": 0 if ok else 1,
-        "expected_code": "runtime/source test boundary",
+        "expected_code": "runtime/source boundary drift guard",
         "result": "PASS" if ok else "FAIL",
         "reason": reason,
     }
@@ -1209,6 +1241,7 @@ def main() -> int:
             RUNTIME_TESTS,
             RUNTIME_MANIFEST,
             PACKAGE_TOOL,
+            CONTRACT_VALIDATOR,
         )
         if not path.is_file()
     ]

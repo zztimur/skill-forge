@@ -29,6 +29,7 @@ from runtime_manifest import (
     MANIFEST_PATH,
     RuntimeManifestBuild,
     RuntimeManifestError,
+    SKILL_FORGE_SOURCE_ONLY_SCRIPTS,
     SKILL_FORGE_RUNTIME_SELECTORS,
     build_runtime_manifest,
     canonical_zip_member_names,
@@ -57,16 +58,9 @@ REQUIRED_MEMBERS = {
 }
 REQUIRED_DIRECTORIES = ("agents", "references", "scripts")
 FORBIDDEN_COMPONENTS = {".git", ".github", "build", "dist", "__pycache__"}
-# These release-pipeline helpers are useful in the source repository, but are
-# deliberately not part of the installed Skill runtime. Keep explicit entries
-# so a future broad scripts/ inclusion cannot silently ship them.
-FORBIDDEN_RUNTIME_PATHS = {
-    "scripts/generate_release_notes.py",
-    "scripts/release_metadata.py",
-    "scripts/release_skill.py",
-    "scripts/run_source_tests.py",
-    "scripts/verify_independent_evaluator.py",
-}
+# Runtime exclusions share the runtime-manifest authority; the audit-contract
+# validator separately proves the matching SKILL.md declaration.
+FORBIDDEN_RUNTIME_PATHS = frozenset(SKILL_FORGE_SOURCE_ONLY_SCRIPTS)
 # Keep aliases out of release verification: they intentionally produce the
 # same findings as their canonical profile and add no independent evidence.
 TARGETS = ("portable", "openai")

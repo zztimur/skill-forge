@@ -16,6 +16,9 @@ import sys
 from pathlib import Path
 from typing import Any, List, Mapping, Optional, Sequence
 
+from package_skill import FORBIDDEN_RUNTIME_PATHS
+from runtime_manifest import SKILL_FORGE_RUNTIME_SELECTORS, runtime_boundary_issues
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = REPO_ROOT / "references" / "audit-contract.json"
@@ -34,6 +37,10 @@ SKILL_PATH = REPO_ROOT / "SKILL.md"
 README_PATH = REPO_ROOT / "README.md"
 AUDIT_CHECKLIST_PATH = REPO_ROOT / "references" / "audit-checklist.md"
 OPENAI_METADATA_PATH = REPO_ROOT / "agents" / "openai.yaml"
+SOURCE_ONLY_DECLARATION_PATTERN = re.compile(
+    r"<!--\s*skill-forge:source-only\s+(.+?)\s*-->",
+    re.IGNORECASE | re.DOTALL,
+)
 
 EXPECTED_RESULTS = ["Pass", "Fail", "Partial", "Not Assessed", "Not Applicable"]
 EXPECTED_EVIDENCE = ["Verified", "Inferred", "Unverified"]
@@ -1195,6 +1202,39 @@ def validate_skill_control_plane(issues: List[str]) -> None:
         issues.append("SKILL.md must not advertise an 11/10 result")
 
 
+def source_only_declaration_paths(skill_text: str, issues: List[str]) -> tuple[str, ...]:
+    """Parse the one reserved source-only declaration without accepting prose."""
+    matches = SOURCE_ONLY_DECLARATION_PATTERN.findall(skill_text)
+    if len(matches) != 1:
+        issues.append(
+            "SKILL.md must contain exactly one skill-forge:source-only declaration"
+        )
+        return ()
+    paths = tuple(matches[0].split())
+    if not paths:
+        issues.append("SKILL.md source-only declaration must list one or more paths")
+    elif len(paths) != len(set(paths)):
+        issues.append("SKILL.md source-only declaration must not repeat paths")
+    return paths
+
+
+def validate_runtime_boundary_contract(issues: List[str]) -> None:
+    """Keep source docs, manifest selectors, and package exclusions aligned."""
+    skill = read_text(SKILL_PATH, issues)
+    if not skill:
+        return
+    declaration_issues: List[str] = []
+    declared_paths = source_only_declaration_paths(skill, declaration_issues)
+    issues.extend(declaration_issues)
+    issues.extend(
+        runtime_boundary_issues(
+            SKILL_FORGE_RUNTIME_SELECTORS,
+            FORBIDDEN_RUNTIME_PATHS,
+            declared_paths,
+        )
+    )
+
+
 def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
     texts = {
         CHECKLIST_PATH: read_text(CHECKLIST_PATH, issues),
@@ -1479,6 +1519,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     validate_documents(contract, issues)
     validate_inspector_documentation(issues)
     validate_skill_control_plane(issues)
+    validate_runtime_boundary_contract(issues)
     report = {
         "status": "pass" if not issues else "fail",
         "contract": str(CONTRACT_PATH.relative_to(REPO_ROOT)),

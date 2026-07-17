@@ -32,18 +32,34 @@ HASH_ALGORITHM = "sha256"
 MANIFEST_PATH = "runtime-manifest.json"
 MANIFEST_SELF_HASH_POLICY = "excluded"
 SELECTION_POLICY = "skill-forge.runtime-paths.v1"
-SKILL_FORGE_RUNTIME_SELECTORS = (
+SKILL_FORGE_RUNTIME_STATIC_SELECTORS = (
     "SKILL.md",
     "README.md",
     "LICENSE",
     "agents",
     "references",
+)
+SKILL_FORGE_RUNTIME_SCRIPT_PATHS = (
     "scripts/inspect_skill_package.py",
     "scripts/package_skill.py",
     "scripts/portable_zip_paths.py",
     "scripts/run_self_tests.py",
     "scripts/runtime_manifest.py",
     "scripts/validate_audit_contract.py",
+)
+# Repository-maintenance helpers are intentionally excluded from the runtime
+# ZIP. Keep this list authoritative; the source contract checks the matching
+# SKILL.md declaration and package verifier boundary.
+SKILL_FORGE_SOURCE_ONLY_SCRIPTS = (
+    "scripts/generate_release_notes.py",
+    "scripts/release_metadata.py",
+    "scripts/release_skill.py",
+    "scripts/run_source_tests.py",
+    "scripts/verify_independent_evaluator.py",
+)
+SKILL_FORGE_RUNTIME_SELECTORS = (
+    *SKILL_FORGE_RUNTIME_STATIC_SELECTORS,
+    *SKILL_FORGE_RUNTIME_SCRIPT_PATHS,
 )
 CANONICAL_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 CANONICAL_ZIP_COMPRESSION = zipfile.ZIP_STORED
@@ -79,6 +95,69 @@ class RuntimeManifestError(RuntimeError):
 
 class GitEvidenceUnavailableError(RuntimeManifestError):
     """Raised when trusted Git evidence cannot currently be obtained."""
+
+
+def _boundary_set_issues(label: str, actual: set[str], expected: set[str]) -> List[str]:
+    """Describe deterministic missing/extra path drift for one boundary view."""
+    issues: List[str] = []
+    missing = sorted(expected - actual)
+    unexpected = sorted(actual - expected)
+    if missing:
+        issues.append(f"{label} missing canonical paths: {', '.join(missing)}")
+    if unexpected:
+        issues.append(f"{label} has non-canonical paths: {', '.join(unexpected)}")
+    return issues
+
+
+def runtime_boundary_issues(
+    runtime_selectors: Iterable[str] = SKILL_FORGE_RUNTIME_SELECTORS,
+    forbidden_runtime_paths: Iterable[str] = SKILL_FORGE_SOURCE_ONLY_SCRIPTS,
+    declared_source_only_paths: Iterable[str] = SKILL_FORGE_SOURCE_ONLY_SCRIPTS,
+) -> List[str]:
+    """Return source/runtime boundary drift without mutating package state.
+
+    ``SKILL_FORGE_RUNTIME_SCRIPT_PATHS`` and
+    ``SKILL_FORGE_SOURCE_ONLY_SCRIPTS`` are the authoritative classifications.
+    Callers supply the manifest selectors, package exclusions, and SKILL.md
+    declaration so this function can detect missing, extra, and misclassified
+    paths across the three independent representations.
+    """
+    selectors = set(runtime_selectors)
+    runtime_scripts = {path for path in selectors if path.startswith("scripts/")}
+    forbidden = set(forbidden_runtime_paths)
+    declared = set(declared_source_only_paths)
+    expected_runtime = set(SKILL_FORGE_RUNTIME_SCRIPT_PATHS)
+    expected_source_only = set(SKILL_FORGE_SOURCE_ONLY_SCRIPTS)
+    issues = _boundary_set_issues("runtime selectors", runtime_scripts, expected_runtime)
+    issues.extend(
+        _boundary_set_issues(
+            "package forbidden runtime paths", forbidden, expected_source_only
+        )
+    )
+    issues.extend(
+        _boundary_set_issues(
+            "SKILL.md source-only declaration", declared, expected_source_only
+        )
+    )
+    selected_source_only = sorted(runtime_scripts & expected_source_only)
+    if selected_source_only:
+        issues.append(
+            "runtime selectors include source-only paths: "
+            + ", ".join(selected_source_only)
+        )
+    forbidden_runtime = sorted(forbidden & expected_runtime)
+    if forbidden_runtime:
+        issues.append(
+            "package forbidden runtime paths misclassify runtime paths: "
+            + ", ".join(forbidden_runtime)
+        )
+    declared_runtime = sorted(declared & expected_runtime)
+    if declared_runtime:
+        issues.append(
+            "SKILL.md source-only declaration misclassifies runtime paths: "
+            + ", ".join(declared_runtime)
+        )
+    return issues
 
 
 @dataclass(frozen=True)
