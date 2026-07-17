@@ -6,6 +6,29 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+## [v2.0.0] - 2026-07-17
+
+### Added
+
+- Added a one-time, explicitly pinned schema 5 to 6 bootstrap path for
+  independently inspecting the exact v2.0.0 candidate without exposing raw
+  frontmatter or treating the transition as a reusable schema-6 pass.
+
+### Changed
+
+- Changed inspector JSON to schema 6. Frontmatter output is now structural and
+  redacted instead of serializing raw values; integrations that consume this
+  field must update for the new output contract.
+- Centralized the canonical runtime-file boundary shared by packaging, source
+  proof, and tests, and aligned the audit contract and resource-routing guidance
+  with the supported Portable and OpenAI profiles.
+
+### Fixed
+
+- Rejected payload-bearing ZIP directory entries and non-finite YAML numbers,
+  detected absolute shell pipeline targets, and recognized source-only tool
+  declarations without weakening strict inspection coverage.
+
 ## [v1.0.1] - 2026-07-17
 
 ### Changed
