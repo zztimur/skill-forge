@@ -6,6 +6,15 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+### Changed
+
+- Re-established Skill Forge as a clean v1 release with portable and OpenAI as
+  its supported validation profiles.
+
+### Removed
+
+- Removed retired host-specific profiles and their related validation paths.
+
 ## [v0.6.1] - 2026-07-16
 
 ### Fixed
