@@ -259,6 +259,14 @@ Assessed. The helper does not provide an OS filesystem sandbox or network
 sandbox and makes no continuous-immutability claim. A Pass is independent
 strict-inspection evidence, not a complete release verdict.
 
+The sole exception is the one-time schema 5 to 6 bootstrap for `v2.0.0`. It
+requires a pretrusted schema-5 evaluator plus both
+`--bootstrap-schema-transition 5:6` and `--bootstrap-release-tag v2.0.0`.
+The reduced report excludes raw schema-5 frontmatter and labels a successful
+run **bootstrap transition evidence**, not an independent schema-6 pass. It can
+support G09 only with every contract requirement and cannot be reused after
+`v2.0.0`.
+
 ## Safety notes
 
 Treat uploaded archives and bundled scripts as untrusted input.

@@ -27,8 +27,13 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 REQUIRED_INSPECTOR_SCHEMA_VERSION = 6
+BOOTSTRAP_INSPECTOR_SCHEMA_VERSION = 5
+BOOTSTRAP_SCHEMA_TRANSITION = "5:6"
+BOOTSTRAP_RELEASE_TAG = "v2.0.0"
+BOOTSTRAP_EVIDENCE_LABEL = "bootstrap transition evidence"
+BOOTSTRAP_TRANSITION_REUSABLE = False
 SOURCE_REPO = Path(__file__).resolve().parents[1]
 INSPECTOR_RELATIVE_PATH = "scripts/inspect_skill_package.py"
 PROFILES = ("portable", "openai")
@@ -603,6 +608,7 @@ def _profile_result(
     profile: str,
     process: ProcessResult,
     expected_input: Path,
+    bootstrap_transition: bool = False,
 ) -> Dict[str, Any]:
     result: Dict[str, Any] = {
         "status": "fail",
@@ -612,6 +618,9 @@ def _profile_result(
         "stdout_bytes": process.stdout_bytes,
         "stderr_bytes": process.stderr_bytes,
         "schema_version": None,
+        "schema_compatibility": None,
+        "evidence_label": None,
+        "raw_frontmatter_propagated": False,
         "input": None,
         "input_type": None,
         "manifest_verification_complete": None,
@@ -645,14 +654,33 @@ def _profile_result(
         return result
 
     inspector_schema = data.get("schema_version")
+    if isinstance(inspector_schema, bool) or not isinstance(inspector_schema, int):
+        result["status"] = "not_assessed"
+        errors.append(
+            "scratch inspector schema is incompatible: expected an integer schema version"
+        )
+        return result
     result["schema_version"] = inspector_schema
-    if inspector_schema != REQUIRED_INSPECTOR_SCHEMA_VERSION:
+    expected_schema = (
+        BOOTSTRAP_INSPECTOR_SCHEMA_VERSION
+        if bootstrap_transition
+        else REQUIRED_INSPECTOR_SCHEMA_VERSION
+    )
+    if inspector_schema != expected_schema:
         result["status"] = "not_assessed"
         errors.append(
             "scratch inspector schema is incompatible: expected "
-            f"{REQUIRED_INSPECTOR_SCHEMA_VERSION}, received {inspector_schema!r}"
+            f"{expected_schema}, received {inspector_schema}"
         )
         return result
+    result["schema_compatibility"] = (
+        "bootstrap_5_to_6" if bootstrap_transition else "exact"
+    )
+    result["evidence_label"] = (
+        BOOTSTRAP_EVIDENCE_LABEL
+        if bootstrap_transition
+        else "independent strict-inspection evidence"
+    )
 
     requested = data.get("requested_target")
     canonical = data.get("canonical_target")
@@ -744,10 +772,34 @@ def _base_report(
     expected_inspector: Optional[str],
     expected_tree: Optional[str],
     expected_candidate: Optional[str],
+    bootstrap_schema_transition: Optional[str],
+    bootstrap_release_tag: Optional[str],
 ) -> Dict[str, Any]:
+    transition_requested = (
+        bootstrap_schema_transition is not None or bootstrap_release_tag is not None
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "status": "not_assessed",
+        "evidence_class": (
+            "bootstrap_transition"
+            if transition_requested
+            else "independent_schema_match"
+        ),
+        "schema_transition": {
+            "requested": transition_requested,
+            "activated": False,
+            "requested_transition": bootstrap_schema_transition,
+            "requested_release_tag": bootstrap_release_tag,
+            "allowed_transition": BOOTSTRAP_SCHEMA_TRANSITION,
+            "allowed_release_tag": BOOTSTRAP_RELEASE_TAG,
+            "from_schema_version": BOOTSTRAP_INSPECTOR_SCHEMA_VERSION,
+            "to_schema_version": REQUIRED_INSPECTOR_SCHEMA_VERSION,
+            "evidence_label": BOOTSTRAP_EVIDENCE_LABEL,
+            "counts_as_independent_schema_6_pass": False,
+            "raw_frontmatter_report_output": "forbidden",
+            "reusable_after_release": BOOTSTRAP_TRANSITION_REUSABLE,
+        },
         "evaluator_provenance": {
             "label": "independently-installed-local-skill",
             "path": str(evaluator_root),
@@ -816,6 +868,8 @@ def verify_independently(
     expected_inspector_sha256: Optional[str] = None,
     expected_evaluator_tree_sha256: Optional[str] = None,
     expected_candidate_sha256: Optional[str] = None,
+    bootstrap_schema_transition: Optional[str] = None,
+    bootstrap_release_tag: Optional[str] = None,
 ) -> Dict[str, Any]:
     report = _base_report(
         evaluator_root_argument,
@@ -823,14 +877,33 @@ def verify_independently(
         expected_inspector_sha256,
         expected_evaluator_tree_sha256,
         expected_candidate_sha256,
+        bootstrap_schema_transition,
+        bootstrap_release_tag,
     )
     errors: List[str] = report["errors"]
     evaluator_root: Optional[Path] = None
     archive: Optional[Path] = None
     evaluator_before: Optional[TreeSnapshot] = None
     candidate_before: Optional[RegularFileSnapshot] = None
+    bootstrap_transition = False
 
     try:
+        transition_requested = (
+            bootstrap_schema_transition is not None
+            or bootstrap_release_tag is not None
+        )
+        if transition_requested:
+            if (
+                bootstrap_schema_transition != BOOTSTRAP_SCHEMA_TRANSITION
+                or bootstrap_release_tag != BOOTSTRAP_RELEASE_TAG
+            ):
+                raise VerificationError(
+                    "bootstrap transition requires both "
+                    f"--bootstrap-schema-transition {BOOTSTRAP_SCHEMA_TRANSITION} and "
+                    f"--bootstrap-release-tag {BOOTSTRAP_RELEASE_TAG}"
+                )
+            bootstrap_transition = True
+            report["schema_transition"]["activated"] = True
         if expected_inspector_sha256 is not None and not _is_sha256(expected_inspector_sha256):
             raise VerificationError("--expected-inspector-sha256 must be exactly 64 hexadecimal characters")
         if not _is_sha256(expected_evaluator_tree_sha256):
@@ -965,7 +1038,12 @@ def verify_independently(
                 process = _run_bounded(command, work_directory, environment)
                 if process.launched:
                     report["scratch_execution"] = True
-                profile_report = _profile_result(profile, process, archive_copy)
+                profile_report = _profile_result(
+                    profile,
+                    process,
+                    archive_copy,
+                    bootstrap_transition=bootstrap_transition,
+                )
                 report["profiles"][profile] = profile_report
                 if profile_report["status"] == "not_assessed":
                     profile_not_assessed = True
@@ -1081,6 +1159,20 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         required=True,
         help="required expected SHA-256 for the candidate archive",
     )
+    parser.add_argument(
+        "--bootstrap-schema-transition",
+        help=(
+            "one-time schema transition; only '5:6' is accepted and it must be "
+            "paired with --bootstrap-release-tag v2.0.0"
+        ),
+    )
+    parser.add_argument(
+        "--bootstrap-release-tag",
+        help=(
+            "candidate release identity for the one-time schema transition; "
+            "only v2.0.0 is accepted"
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -1093,7 +1185,16 @@ def render_report(report: Mapping[str, Any]) -> str:
         f"Evaluator tree SHA-256: {evaluator.get('tree_sha256') or 'Not Assessed'}",
         f"Inspector SHA-256: {evaluator.get('inspector_sha256') or 'Not Assessed'}",
         f"Candidate SHA-256: {candidate.get('sha256') or 'Not Assessed'}",
+        f"Evidence class: {report.get('evidence_class')}",
     ]
+    transition = report.get("schema_transition", {})
+    if transition.get("requested"):
+        lines.append(
+            "Schema transition: "
+            f"{transition.get('requested_transition')} for "
+            f"{transition.get('requested_release_tag')} "
+            f"(activated: {transition.get('activated')})"
+        )
     for profile in PROFILES:
         profile_report = report.get("profiles", {}).get(profile)
         if profile_report is not None:
@@ -1112,6 +1213,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         args.expected_inspector_sha256,
         args.expected_evaluator_tree_sha256,
         args.expected_candidate_sha256,
+        args.bootstrap_schema_transition,
+        args.bootstrap_release_tag,
     )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True, allow_nan=False))

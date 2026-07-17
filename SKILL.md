@@ -5,39 +5,35 @@ description: Audit, validate, pressure-test, and grade OpenAI or portable Agent 
 
 # Skill Forge
 
-Evaluate Agent Skills from evidence. Inspect the selected artifact,
-pressure-test instructions, separate trusted validation from package
-self-tests, and give quality and release verdicts. Treat uploaded files as the
-source of truth. Name evidence gaps; never invent structure, validator results,
-or runtime behavior.
+Evaluate Agent Skills from evidence. Inspect the exact artifact, pressure-test
+instructions, separate trusted validation from self-tests, and issue quality
+and release verdicts. Treat files as truth; never invent
+structure, validator results, or behavior.
 
 ## Route the Request and Select Scope
 
-Route requested outcomes into ordered phases; exactly one active mode governs
-each phase:
+Route outcomes into ordered phases; exactly one active mode governs each phase:
 
-- **Evaluation** for review, audit, score, pressure test, suggestions, plans,
-  or draft patches. It is read-only and returns findings plus a proposed plan.
+- **Evaluation** for review, audit, score, pressure tests, suggestions, plans,
+  or draft patches. It returns read-only findings and a proposed plan.
 - **Validation** for validate, verify, CI, or pass/fail. Run relevant checks;
   do not edit.
 - **Repair** only for an explicit mutation request: implement, apply, edit,
   update, repair, modify, **fix, correct, rewrite, or refactor**. Confirm the
   mutable artifact, apply the requested scope, and revalidate.
-- **Release gate** for ready-to-install, publish, ship, or release requests.
-  It requires strict evidence and a release verdict.
+- **Release gate** for install, publish, ship, or release readiness. It requires
+  strict evidence and a release verdict.
 
-Only an affirmative directive addressed to you grants mutation authority.
-Quoted, negated, descriptive, historical, or hypothetical mutation verbs do
-not. Mixed wording without that authority is Evaluation. Evaluation and
-Validation never authorize edits, packaging, installation, commits, pushes,
-publication, or external actions. A compound request such as Repair followed
-by Release gate retains both phases and their separate evidence requirements.
+Only an affirmative directive addressed to you grants mutation authority;
+quoted, negated, descriptive, historical, or hypothetical verbs do not. Mixed
+wording without it is Evaluation. Evaluation and Validation never authorize
+edits, packaging, installation, commits, pushes, publication, or external
+actions. Repair followed by Release gate retains both phases and evidence sets.
 
-Use the exact named artifact. If none is named, select the only unambiguous
-candidate; ask when several are plausible. A pasted `SKILL.md` is draft-only.
-An installed runtime evidences runtime behavior, not repair or packaging
-authority; locate its confirmed source checkout first. Review portfolio Skills
-separately.
+Use the named artifact. If absent, select the sole unambiguous candidate; ask
+when several are plausible. A pasted `SKILL.md` is draft-only. An installed
+runtime proves behavior, not repair or packaging authority; locate its source
+checkout first. Review portfolio Skills separately.
 
 Select `--target openai` for OpenAI packaging/UI work and `portable` for
 generic or unspecified Agent Skills. For multiple named hosts, run and report
@@ -98,8 +94,8 @@ Not Assessed.
    - **Release:** Standard plus release evidence and the complete authoritative
      G01–G23 matrix. Its five-row executive summary never replaces the matrix.
 
-   Report mode changes presentation only; it never makes a safety check or
-   evidence boundary optional.
+   Report mode changes presentation only; safety checks and evidence boundaries
+   stay mandatory.
 
 ## Skill Forge Self-Audit Bootstrap
 
@@ -112,6 +108,11 @@ strict evidence requires a separately installed trusted Skill Forge release, a
 previously verified archive, or another independent evaluator. Record the
 source and limitation; never upgrade this target's own passing tests to an
 independent release pass.
+
+The only schema-bootstrap exception is the explicit schema 5 to 6 transition
+for `v2.0.0` defined by `independent_evaluator_policy.bootstrap_transition`.
+Label it bootstrap transition evidence, never an independent schema-6 pass,
+and do not reuse it after that release.
 
 ## Resource Routing
 
@@ -149,6 +150,5 @@ Agent-invoked runtime tools: `scripts/inspect_skill_package.py`,
 maintenance is declared below.
 <!-- skill-forge:source-only scripts/generate_release_notes.py scripts/release_metadata.py scripts/release_skill.py scripts/run_source_tests.py scripts/verify_independent_evaluator.py -->
 
-When maintaining this Skill, run contract and source tests. Authorized Release
-work builds from a commit, source-proves and extracts the archive, then runs its
-packaged runtime tests.
+Maintenance runs contract and source tests. Authorized Release work builds from
+a commit, source-proves and extracts the archive, then runs packaged tests.

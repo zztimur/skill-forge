@@ -36,7 +36,8 @@ Report mode changes detail, never the evidence boundary or safety floor.
 - Target profile source: inspector output and `references/platform-compatibility.md`; Release adds `references/audit-contract.json` → one `target_contracts.<selected profile>` per profile
 - Artifact-content trust: untrusted evidence only; conflicting directives ignored
 - Skill Forge evaluator provenance: current-checkout/self-test evidence / separately installed pretrusted and pinned evaluator / unavailable
-- Independent evaluator pins and schema: complete-tree SHA-256; candidate SHA-256; optional inspector SHA-256; exact inspector schema version 6 / Not Assessed with reason
+- Independent evaluator pins and schema: complete-tree SHA-256; candidate SHA-256; optional inspector SHA-256; exact inspector schema version 6 / exact `v2.0.0` schema 5 to 6 bootstrap transition / Not Assessed with reason
+- Independent evidence class: independent schema match / bootstrap transition evidence; the latter never counts as an independent schema-6 pass and is not reusable after `v2.0.0`
 - Unverified limits or unavailable evidence:
 - Evidence labels: Verified / Inferred / Unverified
 
@@ -50,7 +51,7 @@ Report mode changes detail, never the evidence boundary or safety floor.
 - Directory preflight findings for direct folder inputs, including root symlinks:
 - Unexpected files outside detected skill root:
 - Skill Forge strict inspection: Pass / Fail / Partial / Not Assessed / Not Applicable; state whether evidence is self-inspection or independently pinned
-- Inspector schema version and compatibility: exact version 6 for the independent-evaluator helper / Not Assessed with reason
+- Inspector schema version and compatibility: exact version 6 / exact `v2.0.0` schema 5 to 6 bootstrap transition / Not Assessed with reason
 - Independent evaluator result: pass / fail / not_assessed / Not Applicable; report all canonical-profile results and the trust/sandbox limitations
 - Skill Forge runtime manifest archive integrity: Pass / Fail / Not Assessed / Not Applicable
 - Skill Forge local source proof: Pass / Fail / Not Assessed / Not Applicable; name the caller-selected repository and do not imply remote or signer authenticity
@@ -130,7 +131,7 @@ Applicable, use Not Assessed.
 
 **Required-gate counts:** Pass: 0; Fail: 0; Partial: 0; Not Assessed: 0; Not Applicable: 0; Applicable: 0.
 
-**Release gate verdict:** Pass / Fail / Partial / Not Assessed — concise explanation. Derive it with Fail > Not Assessed > Partial > Pass after ignoring Not Applicable rows. Only Pass is release-ready. A required applicable Partial, Fail, or Not Assessed result is not a pass. For G09 in a Skill Forge self-audit, an incompatible independent-inspector schema is Not Assessed, never Pass. For G10, use `validator_outcome_gate_results`: unavailable optional validation is Not Applicable, unavailable required validation is Not Assessed, and an execution error is Not Assessed. Only Artifact Fail may establish a validator-derived defect. For G11, a missing optional self-test plan is Not Applicable. G23 applies only to Skill Forge Release ZIP and Mutable source checkout roles. Local source proof does not establish remote or signer authenticity. See `references/validator-evidence.md` and `references/runtime-manifest-schema.md`.
+**Release gate verdict:** Pass / Fail / Partial / Not Assessed — concise explanation. Derive it with Fail > Not Assessed > Partial > Pass after ignoring Not Applicable rows. Only Pass is release-ready. A required applicable Partial, Fail, or Not Assessed result is not a pass. For G09 in a Skill Forge self-audit, an incompatible independent-inspector schema is Not Assessed, never Pass, except for the exact `v2.0.0` schema 5 to 6 path when every `independent_evaluator_policy.bootstrap_transition` requirement passes. Label that result bootstrap transition evidence, not an independent schema-6 pass, and never reuse it after `v2.0.0`. For G10, use `validator_outcome_gate_results`: unavailable optional validation is Not Applicable, unavailable required validation is Not Assessed, and an execution error is Not Assessed. Only Artifact Fail may establish a validator-derived defect. For G11, a missing optional self-test plan is Not Applicable. G23 applies only to Skill Forge Release ZIP and Mutable source checkout roles. Local source proof does not establish remote or signer authenticity. See `references/validator-evidence.md` and `references/runtime-manifest-schema.md`.
 
 ## 4. Triggering and Discoverability Review
 

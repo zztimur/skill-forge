@@ -40,6 +40,7 @@ Use this checklist while reviewing a skill.
 - Only an Artifact Fail may support a validator-derived artifact defect; Unavailable and Execution Error are evidence limitations
 - Skill Forge findings, independent-evaluator results, official validator results, and package self-test results are reported separately
 - Independent Skill Forge evidence, when used, records a previously trusted complete-tree SHA-256, expected candidate SHA-256, exact inspector schema `6`, portable/OpenAI result, and declared sandbox limitations; a stale schema is Not Assessed
+- For Skill Forge `v2.0.0` only, schema 5 to 6 bootstrap transition evidence requires both exact opt-in arguments, every `independent_evaluator_policy.bootstrap_transition` requirement, reduced output without raw frontmatter, and an explicit statement that it is not an independent schema-6 pass or reusable after that release
 - Target-bundled scripts are never treated as official evidence or executed solely because their name suggests validation
 - Package self-tests run only after purpose and provenance review, with copied or synthetic inputs, network default-deny, credentials absent, source read-only, scratch-only writes, bounded process/time/memory, and external side effects forbidden; if any control is unavailable, do not execute and required evidence is Not Assessed
 - Inspector finding codes are interpreted using `references/inspector-output-schema.md` when needed

@@ -29,6 +29,13 @@ validator is evidence status, never proof that the artifact is invalid.
 results: compatibility does not imply quality, and quality does not rewrite
 compatibility.
 
+For Skill Forge `v2.0.0` only, G09 may use the one-time schema 5 to 6 path in
+`independent_evaluator_policy.bootstrap_transition`. Every listed requirement
+must pass, the helper must label the result **bootstrap transition evidence**,
+and the report must state that this is not an independent schema-6 pass. The
+exception is not reusable after `v2.0.0`; every other release uses exact schema
+6 or is Not Assessed.
+
 | Validator outcome | Optional validator gate | Required validator gate | Compatibility result |
 |---|---|---|---|
 | Pass | Pass | Pass | Compatible |
@@ -63,7 +70,7 @@ All gates allow the five standard result states. “All” profiles means Portab
 | G06 | Documented description or listing limit is met when the selected target defines one | All / Package or Pasted draft | Profile-aware length inspection or documented Not Applicable rationale | Yes |
 | G07 | OpenAI UI metadata is present and valid only when the selected workflow requires it | OpenAI / Package | OpenAI metadata inspection and workflow scope | Yes |
 | G08 | Platform-specific frontmatter fields are valid for the target host | All / Package | Selected-profile frontmatter validation | Yes |
-| G09 | Skill Forge strict inspection passes with complete coverage | All / Package | Trusted `--strict` result, `coverage_complete: true`, `manifest_verification_complete: true`, no unverified manifests, and no unscanned paths | Yes |
+| G09 | Skill Forge strict inspection passes with complete coverage | All / Package | Trusted `--strict` result, `coverage_complete: true`, `manifest_verification_complete: true`, no unverified manifests, and no unscanned paths; for Skill Forge `v2.0.0` only, every schema 5 to 6 bootstrap-transition requirement | Yes |
 | G10 | Trusted official platform validator outcome is mapped to the gate result | OpenAI / Package | Trusted validator provenance, `validator_outcome`, and contract mapping | Yes |
 | G11 | Approved package self-tests are separately reported | All / Package | Reviewed provenance; network default-deny; credentials absent; source read-only; scratch-only writes; bounded process, time, and memory; external side effects forbidden; outcome recorded | Yes |
 | G12 | Skill Forge source-only and packaged-runtime tests pass after evaluator or script changes | All / Mutable source checkout | `scripts/run_source_tests.py` plus `scripts/run_self_tests.py` from the extracted archive built from and source-proved against a committed revision, after any relevant evaluator or script change | Yes |

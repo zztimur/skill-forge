@@ -1,5 +1,5 @@
 {
-  "contract_version": 3,
+  "contract_version": 4,
   "result_enums": [
     "Pass",
     "Fail",
@@ -302,6 +302,33 @@
     "unmet_required_control_result": "Not Assessed",
     "unmet_required_control_is_artifact_failure": false,
     "optional_plan_absent_result": "Not Applicable"
+  },
+  "independent_evaluator_policy": {
+    "default_required_schema_version": 6,
+    "older_schema_default_result": "Not Assessed",
+    "bootstrap_transition": {
+      "transition_id": "schema-5-to-6-v2.0.0",
+      "from_schema_version": 5,
+      "to_schema_version": 6,
+      "release_tag": "v2.0.0",
+      "explicit_opt_in_arguments": [
+        "--bootstrap-schema-transition 5:6",
+        "--bootstrap-release-tag v2.0.0"
+      ],
+      "evidence_label": "bootstrap transition evidence",
+      "counts_as_independent_schema_6_pass": false,
+      "g09_eligible": true,
+      "g09_requirements": [
+        "pretrusted complete schema-5 evaluator tree and inspector pins recorded before the run",
+        "exact candidate SHA-256 pin",
+        "portable and openai strict results pass with complete coverage and manifest verification",
+        "reduced report excludes raw schema-5 frontmatter",
+        "candidate release identity is exactly v2.0.0",
+        "schema-6 privacy and output-contract checks pass separately"
+      ],
+      "raw_frontmatter_report_output": "forbidden",
+      "reusable_after_release": false
+    }
   },
   "pressure_test_policy": {
     "methods": [
@@ -779,7 +806,7 @@
         "Mutable source checkout"
       ],
       "required_evidence": [
-        "Trusted Skill Forge --strict result, coverage_complete true, no unscanned paths, manifest_verification_complete true, and no unverified manifests"
+        "Trusted Skill Forge --strict result, coverage_complete true, no unscanned paths, manifest_verification_complete true, and no unverified manifests; only for Skill Forge v2.0.0, independent_evaluator_policy.bootstrap_transition may supply G09 when every transition requirement passes, labeled bootstrap transition evidence rather than an independent schema-6 pass"
       ],
       "allowed_results": [
         "Pass",

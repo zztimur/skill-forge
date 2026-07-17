@@ -780,6 +780,13 @@ def run_independent_evaluator_case() -> dict[str, Any]:
             failures.append(
                 "independent evaluator schema requirement drifted from the inspector"
             )
+        if not (
+            evaluator.BOOTSTRAP_INSPECTOR_SCHEMA_VERSION == 5
+            and evaluator.BOOTSTRAP_SCHEMA_TRANSITION == "5:6"
+            and evaluator.BOOTSTRAP_RELEASE_TAG == "v2.0.0"
+            and evaluator.BOOTSTRAP_TRANSITION_REUSABLE is False
+        ):
+            failures.append("independent evaluator bootstrap transition drifted")
 
         def stub_source(mode: str) -> str:
             return (
@@ -806,7 +813,7 @@ def run_independent_evaluator_case() -> dict[str, Any]:
                 "canonical = 'portable' if mode == 'target-mismatch' else target\n"
                 "coverage = False if mode == 'incomplete' else True\n"
                 "report = {\n"
-                "    'schema_version': 3 if mode == 'stale-schema' else 6,\n"
+                "    'schema_version': 4 if mode == 'stale-schema' else 5 if mode == 'schema-5' else 6,\n"
                 "    'input': sys.argv[1], 'input_exists': True, 'input_type': 'zip',\n"
                 "    'manifest_verification_complete': True,\n"
                 "    'requested_target': target,\n"
@@ -819,6 +826,7 @@ def run_independent_evaluator_case() -> dict[str, Any]:
                 "        'warning_count': 0,\n"
                 "        'finding_count': 1 if mode == 'inconsistent-summary' else 0,\n"
                 "    },\n"
+                "    'frontmatter': {'name': 'RAW_SCHEMA_5_FRONTMATTER_SENTINEL'},\n"
                 "}\n"
                 "print(json.dumps(report, sort_keys=True))\n"
             )
@@ -854,6 +862,8 @@ def run_independent_evaluator_case() -> dict[str, Any]:
                 *,
                 tree_digest: Optional[str] = None,
                 candidate_digest: Optional[str] = None,
+                bootstrap_schema_transition: Optional[str] = None,
+                bootstrap_release_tag: Optional[str] = None,
             ) -> dict[str, Any]:
                 pinned_tree = (
                     tree_digest
@@ -866,6 +876,8 @@ def run_independent_evaluator_case() -> dict[str, Any]:
                     inspector_digest,
                     pinned_tree,
                     candidate_digest or candidate_before,
+                    bootstrap_schema_transition,
+                    bootstrap_release_tag,
                 )
 
             clean_root, clean_digest = build_stub(root, "clean")
@@ -984,6 +996,130 @@ def run_independent_evaluator_case() -> dict[str, Any]:
                 )
             ):
                 failures.append(f"stale evaluator schema was accepted: {stale_report!r}")
+
+            schema_5_root, schema_5_digest = build_stub(root, "schema-5")
+            schema_5_default_report = verify_stub(schema_5_root, schema_5_digest)
+            if not (
+                schema_5_default_report.get("status") == "not_assessed"
+                and all(
+                    item.get("status") == "not_assessed"
+                    for item in schema_5_default_report.get("profiles", {}).values()
+                )
+            ):
+                failures.append(
+                    "schema 5 evaluator passed without transition opt-in: "
+                    f"{schema_5_default_report!r}"
+                )
+
+            schema_5_transition_report = verify_stub(
+                schema_5_root,
+                schema_5_digest,
+                bootstrap_schema_transition="5:6",
+                bootstrap_release_tag="v2.0.0",
+            )
+            serialized_transition_report = json.dumps(
+                schema_5_transition_report,
+                sort_keys=True,
+            )
+            if not (
+                schema_5_transition_report.get("status") == "pass"
+                and schema_5_transition_report.get("evidence_class")
+                == "bootstrap_transition"
+                and schema_5_transition_report.get("schema_transition", {}).get(
+                    "activated"
+                )
+                is True
+                and schema_5_transition_report.get("schema_transition", {}).get(
+                    "counts_as_independent_schema_6_pass"
+                )
+                is False
+                and schema_5_transition_report.get("schema_transition", {}).get(
+                    "reusable_after_release"
+                )
+                is False
+                and all(
+                    item.get("status") == "pass"
+                    and item.get("schema_version") == 5
+                    and item.get("schema_compatibility") == "bootstrap_5_to_6"
+                    and item.get("evidence_label")
+                    == evaluator.BOOTSTRAP_EVIDENCE_LABEL
+                    and item.get("raw_frontmatter_propagated") is False
+                    for item in schema_5_transition_report.get(
+                        "profiles", {}
+                    ).values()
+                )
+                and "RAW_SCHEMA_5_FRONTMATTER_SENTINEL"
+                not in serialized_transition_report
+            ):
+                failures.append(
+                    "schema 5 transition evidence was unsafe or incomplete: "
+                    f"{schema_5_transition_report!r}"
+                )
+
+            for transition, release_tag, label in (
+                ("5:6", None, "missing release tag"),
+                (None, "v2.0.0", "missing schema transition"),
+                ("5:6", "v2.0.1", "post-v2 reuse"),
+                ("4:6", "v2.0.0", "wrong source schema"),
+            ):
+                invalid_transition_report = verify_stub(
+                    schema_5_root,
+                    schema_5_digest,
+                    bootstrap_schema_transition=transition,
+                    bootstrap_release_tag=release_tag,
+                )
+                if not (
+                    invalid_transition_report.get("status") == "not_assessed"
+                    and not invalid_transition_report.get("profiles")
+                    and invalid_transition_report.get("schema_transition", {}).get(
+                        "activated"
+                    )
+                    is False
+                ):
+                    failures.append(
+                        f"{label} transition was accepted: "
+                        f"{invalid_transition_report!r}"
+                    )
+
+            schema_6_transition_report = verify_stub(
+                clean_root,
+                clean_digest,
+                bootstrap_schema_transition="5:6",
+                bootstrap_release_tag="v2.0.0",
+            )
+            if not (
+                schema_6_transition_report.get("status") == "not_assessed"
+                and all(
+                    item.get("status") == "not_assessed"
+                    for item in schema_6_transition_report.get(
+                        "profiles", {}
+                    ).values()
+                )
+            ):
+                failures.append(
+                    "schema 6 evaluator was accepted through bootstrap mode: "
+                    f"{schema_6_transition_report!r}"
+                )
+
+            stale_transition_report = verify_stub(
+                stale_root,
+                stale_digest,
+                bootstrap_schema_transition="5:6",
+                bootstrap_release_tag="v2.0.0",
+            )
+            if not (
+                stale_transition_report.get("status") == "not_assessed"
+                and all(
+                    item.get("status") == "not_assessed"
+                    for item in stale_transition_report.get(
+                        "profiles", {}
+                    ).values()
+                )
+            ):
+                failures.append(
+                    "schema 4 evaluator was accepted through bootstrap mode: "
+                    f"{stale_transition_report!r}"
+                )
 
             readonly_root, readonly_digest = build_stub(root, "readonly")
             readonly_scripts = readonly_root / "scripts"

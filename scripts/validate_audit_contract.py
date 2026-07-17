@@ -180,6 +180,33 @@ EXPECTED_SELF_TEST_EXECUTION_POLICY = {
     "unmet_required_control_is_artifact_failure": False,
     "optional_plan_absent_result": "Not Applicable",
 }
+EXPECTED_INDEPENDENT_EVALUATOR_POLICY = {
+    "default_required_schema_version": 6,
+    "older_schema_default_result": "Not Assessed",
+    "bootstrap_transition": {
+        "transition_id": "schema-5-to-6-v2.0.0",
+        "from_schema_version": 5,
+        "to_schema_version": 6,
+        "release_tag": "v2.0.0",
+        "explicit_opt_in_arguments": [
+            "--bootstrap-schema-transition 5:6",
+            "--bootstrap-release-tag v2.0.0",
+        ],
+        "evidence_label": "bootstrap transition evidence",
+        "counts_as_independent_schema_6_pass": False,
+        "g09_eligible": True,
+        "g09_requirements": [
+            "pretrusted complete schema-5 evaluator tree and inspector pins recorded before the run",
+            "exact candidate SHA-256 pin",
+            "portable and openai strict results pass with complete coverage and manifest verification",
+            "reduced report excludes raw schema-5 frontmatter",
+            "candidate release identity is exactly v2.0.0",
+            "schema-6 privacy and output-contract checks pass separately",
+        ],
+        "raw_frontmatter_report_output": "forbidden",
+        "reusable_after_release": False,
+    },
+}
 EXPECTED_ROUTING_RULES = {
     "generic_target": "portable",
     "draft_only_release_result": "Not Assessed",
@@ -584,6 +611,17 @@ def validate_trust_policies(root: Mapping[str, Any], issues: List[str]) -> None:
             "sandbox and map an unmet control to Not Assessed"
         )
 
+    independent_evaluator = require_mapping(
+        root.get("independent_evaluator_policy"),
+        "independent_evaluator_policy",
+        issues,
+    )
+    if dict(independent_evaluator) != EXPECTED_INDEPENDENT_EVALUATOR_POLICY:
+        issues.append(
+            "independent_evaluator_policy must keep schema 6 as the default and "
+            "allow only the non-reusable schema 5 to 6 v2.0.0 bootstrap transition"
+        )
+
     gates = {
         gate.get("id"): gate
         for gate in root.get("gates", [])
@@ -598,6 +636,21 @@ def validate_trust_policies(root: Mapping[str, Any], issues: List[str]) -> None:
     g15_evidence = " ".join(gates.get("G15", {}).get("required_evidence", []))
     if not all(marker in g15_evidence for marker in ("path", "finding_type", "redacted_fingerprint")):
         issues.append("G15 required evidence must use the redacted sensitive-finding record")
+    g09_evidence = " ".join(gates.get("G09", {}).get("required_evidence", []))
+    if not all(
+        marker in g09_evidence
+        for marker in (
+            "Skill Forge v2.0.0",
+            "independent_evaluator_policy.bootstrap_transition",
+            "every transition requirement passes",
+            "bootstrap transition evidence",
+            "rather than an independent schema-6 pass",
+        )
+    ):
+        issues.append(
+            "G09 must keep the schema 5 to 6 bootstrap exception exact, bounded, "
+            "and distinct from an independent schema-6 pass"
+        )
 
 
 def validate_routing_contract(root: Mapping[str, Any], issues: List[str]) -> None:
@@ -801,8 +854,8 @@ def validate_example_safety_consistency(text: str, issues: List[str]) -> None:
 
 def validate_contract(data: Any, issues: List[str]) -> Mapping[str, Any]:
     root = require_mapping(data, "contract", issues)
-    if root.get("contract_version") != 3:
-        issues.append("contract_version must be 3")
+    if root.get("contract_version") != 4:
+        issues.append("contract_version must be 4")
     if root.get("result_enums") != EXPECTED_RESULTS:
         issues.append(f"result_enums must be exactly {EXPECTED_RESULTS!r}")
     if root.get("evidence_labels") != EXPECTED_EVIDENCE:
@@ -1148,6 +1201,9 @@ def validate_skill_control_plane(issues: List[str]) -> None:
         "previously verified archive",
         "another independent evaluator",
         "own passing tests to an\nindependent release pass",
+        "The only schema-bootstrap exception",
+        "bootstrap transition evidence",
+        "do not reuse it after that release",
         "untrusted evidence only",
         "default-deny",
         "source read-only",
@@ -1345,6 +1401,11 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
         "process, wall-time, and memory limits",
         "all 10",
         "independent",
+        "--bootstrap-schema-transition 5:6",
+        "--bootstrap-release-tag v2.0.0",
+        "bootstrap transition evidence",
+        "raw schema-5 frontmatter",
+        "not reusable after that release",
     ):
         add_if_missing(validator_evidence, marker, VALIDATOR_EVIDENCE_PATH, issues)
 
@@ -1378,6 +1439,9 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
         "Live host observation",
         "exact artifact",
         "explicit packaging authority",
+        "bootstrap transition evidence",
+        "independent_evaluator_policy.bootstrap_transition",
+        "never reuse it after `v2.0.0`",
     ):
         add_if_missing(template, marker, TEMPLATE_PATH, issues)
     for marker in EXPECTED_PRESSURE_RESULT_FIELDS:
@@ -1395,8 +1459,28 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
         "exact artifact",
         "Installed runtime",
         "explicit packaging authority",
+        "independent_evaluator_policy.bootstrap_transition",
+        "bootstrap transition evidence",
+        "not reusable after `v2.0.0`",
     ):
         add_if_missing(checklist, marker, CHECKLIST_PATH, issues)
+
+    for marker in (
+        "--bootstrap-schema-transition 5:6",
+        "--bootstrap-release-tag v2.0.0",
+        "bootstrap transition evidence",
+        "cannot be reused after",
+    ):
+        add_if_missing(texts[README_PATH], marker, README_PATH, issues)
+
+    for marker in (
+        "bootstrap transition evidence",
+        "independent_evaluator_policy.bootstrap_transition",
+        "not an independent schema-6 pass",
+    ):
+        add_if_missing(
+            texts[AUDIT_CHECKLIST_PATH], marker, AUDIT_CHECKLIST_PATH, issues
+        )
 
     rubric = texts[RUBRIC_PATH]
     for marker in (
