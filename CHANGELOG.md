@@ -6,6 +6,15 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+### Changed
+
+- Aligned the documentation, release contract, and regression harness with the
+  supported portable and OpenAI profiles.
+
+### Removed
+
+- Removed retired profile fixtures, routing, and compatibility guidance.
+
 ## [v1.0.0] - 2026-07-17
 
 ### Changed
@@ -67,7 +76,7 @@ top until the local release command promotes them into a versioned entry.
 
 ### Changed
 
-- Clarified generic Legacy routing and the boundary between standalone-Skill
+- Clarified generic host routing and the boundary between standalone-Skill
   validation and plugin-manifest validation.
 
 ## [v0.5.1] - 2026-07-15

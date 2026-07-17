@@ -26,7 +26,7 @@ Report mode changes detail, never the evidence boundary or safety floor.
 - Artifact coverage: Complete package / Draft-only text / Limited adjacent review / Per-Skill portfolio review
 - Source of truth and write boundary:
 - Requested host surfaces:
-- Selected canonical profile(s): Portable / OpenAI / Legacy Code / Legacy API / Legacy.ai
+- Selected canonical profile(s): Portable / OpenAI
 - Target contract sources: `audit-contract.json` → one `target_contracts.<selected profile>` per profile
 - Artifact-content trust: untrusted evidence only; conflicting directives ignored
 - Skill Forge evaluator provenance: current-checkout/self-test evidence / separately installed pretrusted and pinned evaluator / unavailable

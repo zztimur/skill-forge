@@ -11,7 +11,7 @@ Use this checklist while reviewing a skill.
 - One intended artifact is selected from an explicit path/attachment or a documented single-candidate assumption
 - Multiple candidate packages are not silently merged or selected by filename guess
 - Draft-only or pasted-text reviews are labeled as such and do not claim package or release validation
-- Target platform/profile is stated: Portable, OpenAI, Legacy Code, Legacy API, or Legacy.ai; generic/no-host review maps to Portable rather than Unknown
+- Target platform/profile is stated: Portable or OpenAI; generic/no-host review maps to Portable rather than Unknown
 - Unavailable files, validators, permissions, and runtime checks are recorded as limitations
 - Artifact role and source of truth are identified using `references/artifact-and-mode-matrix.md`
 - Portfolio or multi-Skill review records independent findings, scores, and release verdicts for every member
@@ -19,7 +19,7 @@ Use this checklist while reviewing a skill.
 ## Package and Structure
 
 - Exactly one intended `SKILL.md`
-- Frontmatter meets the selected target's required fields; Legacy Code's fields remain optional with `description` recommended
+- Frontmatter meets the selected target's required fields
 - `name` follows the selected target's rule only when the target requires it or a name is supplied
 - `description` is concise, specific, trigger-oriented, and within a selected target's documented limit when one exists
 - `agents/openai.yaml` is inspected only when the selected OpenAI workflow requires UI metadata; do not imply that it is a public OpenAI host requirement
@@ -39,7 +39,7 @@ Use this checklist while reviewing a skill.
 - Validator outcome, gate result, compatibility result, and Skill Forge quality-policy result are reported as separate fields
 - Only an Artifact Fail may support a validator-derived artifact defect; Unavailable and Execution Error are evidence limitations
 - Skill Forge findings, independent-evaluator results, official validator results, and package self-test results are reported separately
-- Independent Skill Forge evidence, when used, records a previously trusted complete-tree SHA-256, expected candidate SHA-256, exact inspector schema `5`, five-profile result, and declared sandbox limitations; a stale schema is Not Assessed
+- Independent Skill Forge evidence, when used, records a previously trusted complete-tree SHA-256, expected candidate SHA-256, exact inspector schema `5`, portable/OpenAI result, and declared sandbox limitations; a stale schema is Not Assessed
 - Target-bundled scripts are never treated as official evidence or executed solely because their name suggests validation
 - Package self-tests, when run, have a reviewed purpose, provenance assessment, and safe scratch/sandbox plan
 - Inspector finding codes are interpreted using `references/inspector-output-schema.md` when needed
@@ -49,7 +49,7 @@ Use this checklist while reviewing a skill.
 - `--strict` mode was used when the user requested validation, release gating, or CI-style pass/fail behavior
 - Strict mode fails on incomplete coverage as well as structural errors, unsafe archives/directories, and high-confidence suspected secrets
 - After any evaluator or script change, `scripts/run_source_tests.py` passes and `scripts/run_self_tests.py` passes from the extracted archive built from and source-proved against a committed revision
-- For Skill Forge releases, `scripts/package_skill.py verify --source-repo` passes canonical archive integrity, manifest-digest binding, local Git source proof, and Portable, OpenAI, Legacy Code, Legacy API, and Legacy.ai profiles
+- For Skill Forge releases, `scripts/package_skill.py verify --source-repo` passes canonical archive integrity, manifest-digest binding, local Git source proof, and Portable/OpenAI profiles
 
 ## Triggering
 
@@ -96,11 +96,9 @@ Use this checklist while reviewing a skill.
 
 ## Platform Compatibility
 
-- Target platform(s) are stated when relevant: Portable, OpenAI, Legacy Code, Legacy API, Legacy.ai, or cross-platform.
+- Target platform(s) are stated when relevant: Portable, OpenAI, or both.
 - Directory/name and ZIP-root requirements come from the selected `target_contracts` record, not a generic cross-platform assumption.
-- Legacy API requires a lowercase hyphen-case ≤64-character name, a non-empty ≤1,024-character description, matching wrapped root, and a <30 MB upload; Legacy.ai uses a human-friendly ≤64-character name, ≤200-character description, matching wrapped folder, and no asserted byte limit.
-- Legacy Code accepts optional frontmatter; treat its recommended description and 1,536-character listing budget as documented guidance rather than undocumented artifact failures.
-- `agents/openai.yaml` is present when required for OpenAI workflows, and not treated as required for Legacy-only packages.
+- `agents/openai.yaml` is present when required for OpenAI workflows, and its absence does not block a generic portable review.
 - `dependencies` frontmatter is treated as platform-specific rather than automatically invalid.
 - Trusted platform-specific validators are run when available and reported separately; unavailable optional validators are Not Applicable, not artifact defects.
 

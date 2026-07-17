@@ -226,7 +226,7 @@ def validate_portable_path_records(records_to_validate: Iterable[Tuple[str, bool
     collision class for each later record while preserving deterministic order.
 
     ``path_rule`` is the neutral policy key that direct-folder consumers should
-    route on. Legacy ZIP finding codes remain on each issue so the compatibility
+    route on. Existing ZIP finding codes remain on each issue so the compatibility
     wrapper can preserve its public result contract.
     """
     records: List[PortableZipMember] = []

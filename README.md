@@ -172,7 +172,7 @@ This repository includes a GitHub Actions workflow at `.github/workflows/self-te
 Every Ubuntu, macOS, and Windows job runs on Python `3.9` and the latest stable
 release. Each of the six matrix cells validates the contract, runs source-only
 tests, builds the exact submitted commit, verifies archive integrity and local
-Git source proof across all five canonical profiles, extracts the archive, and
+Git source proof across both canonical profiles, extracts the archive, and
 runs its packaged runtime suite. Pull requests check out the contributor's HEAD
 instead of GitHub's temporary merge ref. Keep the workflow dependency-free;
 every third-party GitHub Action is pinned to an immutable commit SHA.
@@ -240,7 +240,7 @@ separately installed, previously trusted Skill Forge runtime. It requires a
 pretrusted SHA-256 for the evaluator's complete tree and an expected candidate
 SHA-256; an optional inspector-file pin is supplemental. It executes scratch
 copies under isolated Python with a credential-reduced environment and bounded
-tree, file, time, and output limits, then checks all five canonical profiles.
+tree, file, time, and output limits, then checks both canonical profiles.
 
 ```bash
 python3 -S scripts/verify_independent_evaluator.py \
@@ -314,7 +314,7 @@ signatures, author identity, or release authorization. See the
 The `.github/workflows/release-skill.yml` workflow has a read-only validation
 job and a separate publication job. Validation builds the committed `HEAD`
 runtime archive, runs source-only tests, proves the archive against the checkout,
-extracts it, runs the packaged runtime suite, verifies all five canonical
+extracts it, runs the packaged runtime suite, verifies both canonical
 profiles, and writes `skill-forge.zip.sha256` beside the ZIP. On a tag, it also
 verifies the exact release metadata and generates deterministic notes from the
 tagged commit's changelog blob rather than mutable working-tree text. Only the

@@ -60,7 +60,7 @@ Run these probes before the general categories whenever the request leaves the a
 | The user asks to “validate but do not edit” | Use Validation; run checks and make no changes. |
 | The user asks to repair an installed runtime | Locate and confirm the mutable source checkout before editing; do not package from the installed runtime. |
 | The user supplies two Skills for review | Produce independent findings, scores, and release verdicts; do not hide a failed member in an aggregate. |
-| The user names OpenAI, Legacy, or both | Select and report the corresponding `--target` profile; use `portable` only for generic/cross-platform evidence. |
+| The user names OpenAI or asks for a generic review | Select `--target openai` for OpenAI-specific work; use `portable` for generic/cross-platform evidence. |
 | The selected input is a general repository with no Skill | State that it is outside the package-audit core and offer a limited adjacent review. |
 
 ## Required Test Categories
@@ -143,7 +143,7 @@ For skill packages, include cases such as:
 - direct folder inputs that are root symlinks or contain nested symlinks, oversized files, excessive file counts, or path escapes,
 - bounded text reading for large text-like files,
 - `--strict` exit behavior for structural errors, unsafe archives/directories, and high-confidence secret findings.
-- for Skill Forge releases, a committed runtime-only archive that has the expected root folder, excludes repo-only paths, and passes strict inspection for Portable, OpenAI, Legacy Code, Legacy API, and Legacy.ai.
+- for Skill Forge releases, a committed runtime-only archive that has the expected root folder, excludes repo-only paths, and passes strict inspection for Portable and OpenAI.
 
 Confirm scripts fail safely and produce actionable diagnostics. If the evaluated skill is Skill Forge itself, run `scripts/run_self_tests.py` and report the pass/fail summary in addition to manual simulations.
 

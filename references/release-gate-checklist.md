@@ -51,7 +51,7 @@ compatibility.
 
 ## Required gate matrix
 
-All gates allow the five standard result states. “All” profiles means Portable, OpenAI, Legacy Code, Legacy API, and Legacy.ai. “Package” roles are Release ZIP, Installed runtime, and Mutable source checkout unless a narrower role is shown.
+All gates allow the five standard result states. “All” profiles means Portable and OpenAI. “Package” roles are Release ZIP, Installed runtime, and Mutable source checkout unless a narrower role is shown.
 
 | ID | Title | Applicable profiles / artifact roles | Required evidence | Blocks release |
 |---|---|---|---|---|
@@ -64,7 +64,7 @@ All gates allow the five standard result states. “All” profiles means Portab
 | G07 | OpenAI UI metadata is present and valid only when the selected workflow requires it | OpenAI / Package | OpenAI metadata inspection and workflow scope | Yes |
 | G08 | Platform-specific frontmatter fields are valid for the target host | All / Package | Selected-profile frontmatter validation | Yes |
 | G09 | Skill Forge strict inspection passes with complete coverage | All / Package | Trusted `--strict` result, `coverage_complete: true`, `manifest_verification_complete: true`, no unverified manifests, and no unscanned paths | Yes |
-| G10 | Trusted official platform validator outcome is mapped to the gate result | OpenAI, Legacy Code, Legacy API, Legacy.ai / Package | Trusted validator provenance, `validator_outcome`, and contract mapping | Yes |
+| G10 | Trusted official platform validator outcome is mapped to the gate result | OpenAI / Package | Trusted validator provenance, `validator_outcome`, and contract mapping | Yes |
 | G11 | Approved package self-tests are separately reported | All / Package | Reviewed provenance; network default-deny; credentials absent; source read-only; scratch-only writes; bounded process, time, and memory; external side effects forbidden; outcome recorded | Yes |
 | G12 | Skill Forge source-only and packaged-runtime tests pass after evaluator or script changes | All / Mutable source checkout | `scripts/run_source_tests.py` plus `scripts/run_self_tests.py` from the extracted archive built from and source-proved against a committed revision, after any relevant evaluator or script change | Yes |
 | G13 | Referenced resources are present | All / Package | Reference-resolution inspection | Yes |
@@ -77,7 +77,7 @@ All gates allow the five standard result states. “All” profiles means Portab
 | G20 | Required pressure categories have complete coverage and behavioral results | All / Package or Pasted draft | All nine evidence fields per category; sufficient requirement/method pairing; separate predicted/observed behavior; every Not Applicable result has a rationale | Yes |
 | G21 | Severity-ranked fixes are documented | All / Package or Pasted draft | Critical, High, Medium, Low, and Nit review with evidence and re-tests for material issues | Yes |
 | G22 | Scorecard, caps, severity list, required-gate counts, and verdict reconcile | All / Package or Pasted draft | Arithmetic check of total, cap, counts, severity list, per-profile verdicts, and overall cross-profile roll-up | Yes |
-| G23 | Skill Forge runtime archive is canonical, source-proved, and tested | All / Skill Forge Release ZIP or Mutable source checkout only | Exact Release ZIP verification of canonical manifest/archive integrity, local Git source proof, manifest-digest binding, all five profiles, and extracted-runtime tests; mutable source also requires explicit packaging authority and an archive built from a committed revision | Yes |
+| G23 | Skill Forge runtime archive is canonical, source-proved, and tested | All / Skill Forge Release ZIP or Mutable source checkout only | Exact Release ZIP verification of canonical manifest/archive integrity, local Git source proof, manifest-digest binding, Portable and OpenAI profiles, and extracted-runtime tests; mutable source also requires explicit packaging authority and an archive built from a committed revision | Yes |
 
 ## Decision rule
 

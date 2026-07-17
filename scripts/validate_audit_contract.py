@@ -521,7 +521,7 @@ def validate_release_evidence_semantics(root: Mapping[str, Any], issues: List[st
             "canonical runtime-manifest archive integrity",
             "local Git source proof",
             "manifest-digest binding",
-            "all five canonical profiles",
+            "portable and openai profiles",
             "extracted-runtime tests",
             "explicit packaging authority",
             "archive built from a committed revision",
@@ -1125,7 +1125,7 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
         "ordered phases",
         "affirmative directive",
         "Quoted, negated",
-        "One invocation per named canonical profile",
+        "One invocation per supported canonical profile",
         "cannot certify any host",
     ):
         add_if_missing(texts[ROUTING_PATH], marker, ROUTING_PATH, issues)
@@ -1139,10 +1139,9 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
 
     platform = texts[PLATFORM_PATH]
     for marker in (
-        "Verified on **2026-07-15**",
         "target_contracts",
-        "all fields optional",
-        "no documented product upload limit",
+        "two audit target profiles",
+        "No product upload limit is encoded",
         "one inspector invocation",
         "must not hide",
     ):

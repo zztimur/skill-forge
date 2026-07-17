@@ -1107,7 +1107,7 @@ def run_independent_evaluator_case() -> dict[str, Any]:
         "fixture": str(INDEPENDENT_EVALUATOR),
         "expected_exit": 0,
         "actual_exit": 0 if ok else 1,
-        "expected_code": "five-profile scratch evaluation with mutation proof",
+        "expected_code": "two-profile scratch evaluation with mutation proof",
         "result": "PASS" if ok else "FAIL",
         "reason": reason,
     }

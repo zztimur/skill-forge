@@ -98,10 +98,7 @@
       "name_rule": {
         "mode": "lowercase-hyphen",
         "max_length": 64,
-        "reserved_terms": [
-          "legacy",
-          "provider"
-        ]
+        "reserved_terms": []
       },
       "description_rule": {
         "required": true,
@@ -1119,7 +1116,7 @@
         "Skill Forge"
       ],
       "required_evidence": [
-        "For a Skill Forge Release ZIP, exact-artifact package_skill.py verification of canonical runtime-manifest archive integrity, local Git source proof, manifest-digest binding, all five canonical profiles, and extracted-runtime tests; for Mutable source checkout, explicit packaging authority plus an archive built from a committed revision and the same verification"
+        "For a Skill Forge Release ZIP, exact-artifact package_skill.py verification of canonical runtime-manifest archive integrity, local Git source proof, manifest-digest binding, portable and openai profiles, and extracted-runtime tests; for Mutable source checkout, explicit packaging authority plus an archive built from a committed revision and the same verification"
       ],
       "allowed_results": [
         "Pass",

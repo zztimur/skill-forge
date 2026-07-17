@@ -192,20 +192,6 @@ def build_long_description_skill(tmp: Path) -> Path:
     return skill
 
 
-def build_legacy_reserved_name_skill(tmp: Path) -> Path:
-    skill = tmp / "legacy-helper"
-    skill.mkdir()
-    (skill / "SKILL.md").write_text(
-        "---\n"
-        "name: legacy-helper\n"
-        "description: evaluate skill packages for reserved-name compatibility testing. use only for self-test fixtures.\n"
-        "---\n\n"
-        "# Reserved Name Skill\n",
-        encoding="utf-8",
-    )
-    return skill
-
-
 def zip_dir(source: Path, target: Path) -> Path:
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(source.rglob("*")):
@@ -468,26 +454,6 @@ def build_nested_metadata_frontmatter_skill(tmp: Path) -> Path:
     return skill
 
 
-def build_nested_hook_sequence_skill(tmp: Path) -> Path:
-    """Legacy hook maps can contain maps nested inside sequences."""
-    skill = tmp / "nested-hook-sequence-skill"
-    skill.mkdir()
-    (skill / "SKILL.md").write_text(
-        "---\n"
-        "name: nested-hook-sequence-skill\n"
-        "description: evaluate nested Legacy hook mappings inside YAML sequences without reducing them to unsupported syntax.\n"
-        "hooks:\n"
-        "  PreToolUse:\n"
-        "    - matcher: Bash\n"
-        "      hooks:\n"
-        "        - type: command\n"
-        "          command: ./check.sh\n"
-        "---\n\n# Nested Hook Sequence Skill\n",
-        encoding="utf-8",
-    )
-    return skill
-
-
 def build_unsupported_yaml_frontmatter_skill(tmp: Path) -> Path:
     """Complex YAML keys are valid YAML but outside the restricted parser."""
     skill = tmp / "unsupported-yaml-skill"
@@ -537,155 +503,6 @@ def build_deeply_nested_yaml_skill(tmp: Path) -> Path:
     lines.append("  " * 97 + "value: bounded")
     lines.extend(["---", "", "# Deep YAML Skill", ""])
     (skill / "SKILL.md").write_text("\n".join(lines), encoding="utf-8")
-    return skill
-
-
-def build_legacy_profile_skill(tmp: Path) -> Path:
-    """Legacy Code derives the command from the directory, so name is optional
-    and Legacy-specific invocation fields must be accepted by its profile."""
-    skill = tmp / "legacy-profile-skill"
-    skill.mkdir()
-    (skill / "SKILL.md").write_text(
-        "---\n"
-        "description: review repository changes and identify risks when the user asks for a focused Legacy Code review.\n"
-        "when_to_use: Use for local code review requests.\n"
-        "disable-model-invocation: true\n"
-        "allowed-tools: [Read, Grep]\n"
-        "context: fork\n"
-        "---\n\n# Legacy Profile Skill\n",
-        encoding="utf-8",
-    )
-    return skill
-
-
-def build_legacy_no_description_skill(tmp: Path) -> Path:
-    skill = tmp / "legacy-no-description-skill"
-    skill.mkdir()
-    (skill / "SKILL.md").write_text(
-        "---\n"
-        "disable-model-invocation: true\n"
-        "---\n\n# Legacy No Description Skill\n\nUse the body as fallback context.\n",
-        encoding="utf-8",
-    )
-    return skill
-
-
-def build_legacy_invalid_context_skill(tmp: Path) -> Path:
-    skill = build_legacy_profile_skill(tmp)
-    (skill / "SKILL.md").write_text(
-        "---\n"
-        "description: review repository changes and identify risks when the user asks for a focused Legacy Code review.\n"
-        "context: inline\n"
-        "---\n\n# Legacy Invalid Context Skill\n",
-        encoding="utf-8",
-    )
-    return skill
-
-
-def build_legacy_display_name_skill(tmp: Path) -> Path:
-    skill = tmp / "legacy-directory-command-skill"
-    skill.mkdir()
-    (skill / "SKILL.md").write_text(
-        "---\n"
-        "name: Human Review Label\n"
-        "description: review repository changes and identify risks when the user asks for a focused Legacy Code review.\n"
-        "---\n\n# Legacy Display Name Skill\n",
-        encoding="utf-8",
-    )
-    return skill
-
-
-def build_legacy_ai_profile_skill(tmp: Path) -> Path:
-    """Legacy.ai accepts a human-friendly display name, unlike API naming."""
-    skill = tmp / "brand-guidelines"
-    skill.mkdir()
-    (skill / "SKILL.md").write_text(
-        "---\n"
-        "name: Brand Guidelines\n"
-        "description: Apply our brand rules to presentations and reports when a request needs approved colors, typography, or logo treatment.\n"
-        "dependencies: python>=3.8\n"
-        "---\n\n# Brand Guidelines\n",
-        encoding="utf-8",
-    )
-    return skill
-
-
-def build_legacy_ai_non_latin_match_skill(tmp: Path) -> Path:
-    skill = tmp / "品牌指南"
-    skill.mkdir()
-    (skill / "SKILL.md").write_text(
-        "---\n"
-        "name: 品牌 指南\n"
-        "description: Apply approved brand rules to presentations and reports when a request needs colors, typography, or logo treatment.\n"
-        "---\n\n# 品牌指南\n",
-        encoding="utf-8",
-    )
-    return skill
-
-
-def build_legacy_ai_non_latin_mismatch_skill(tmp: Path) -> Path:
-    skill = tmp / "产品指南"
-    skill.mkdir()
-    (skill / "SKILL.md").write_text(
-        "---\n"
-        "name: 旅行指南\n"
-        "description: Apply approved brand rules to presentations and reports when a request needs colors, typography, or logo treatment.\n"
-        "---\n\n# 产品指南\n",
-        encoding="utf-8",
-    )
-    return skill
-
-
-def build_legacy_ai_empty_identity_skill(tmp: Path) -> Path:
-    skill = tmp / "🎨"
-    skill.mkdir()
-    (skill / "SKILL.md").write_text(
-        "---\n"
-        "name: 🎯\n"
-        "description: Apply approved brand rules to presentations and reports when a request needs colors, typography, or logo treatment.\n"
-        "---\n\n# Emoji Name Skill\n",
-        encoding="utf-8",
-    )
-    return skill
-
-
-def build_openai_reserved_legacy_name_skill(tmp: Path) -> Path:
-    skill = tmp / "legacy-target-skill"
-    skill.mkdir()
-    (skill / "SKILL.md").write_text(
-        "---\n"
-        "name: legacy-target-skill\n"
-        "description: evaluate OpenAI target validation without inheriting a Legacy-only reserved-name restriction. use only for fixtures.\n"
-        "---\n\n# OpenAI Name Fixture\n",
-        encoding="utf-8",
-    )
-    return skill
-
-
-def build_openai_with_legacy_control_skill(tmp: Path) -> Path:
-    skill = tmp / "openai-control-skill"
-    skill.mkdir()
-    (skill / "SKILL.md").write_text(
-        "---\n"
-        "name: openai-control-skill\n"
-        "description: evaluate OpenAI target validation when a Legacy-only invocation control is present. use only for fixtures.\n"
-        "disable-model-invocation: true\n"
-        "---\n\n# OpenAI Control Fixture\n",
-        encoding="utf-8",
-    )
-    return skill
-
-
-def build_legacy_with_invalid_openai_metadata_skill(tmp: Path) -> Path:
-    skill = build_legacy_profile_skill(tmp)
-    metadata = skill / "agents"
-    metadata.mkdir()
-    (metadata / "openai.yaml").write_text(
-        "interface:\n"
-        "  display_name: First\n"
-        "  display_name: Duplicate\n",
-        encoding="utf-8",
-    )
     return skill
 
 
@@ -1304,22 +1121,6 @@ def build_flat_zip_skill(tmp: Path) -> Path:
     return target
 
 
-def build_flat_legacy_api_unsupported_yaml_zip(tmp: Path) -> Path:
-    """Unsupported frontmatter must not bypass Legacy API's wrapped-root gate."""
-    target = tmp / "flat-legacy-api-unsupported.zip"
-    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr(
-            "SKILL.md",
-            "---\n"
-            "name: flat-legacy-api-unsupported\n"
-            "description: evaluate a flat Legacy API archive whose valid YAML exceeds the restricted verifier subset.\n"
-            "? [owner, team]\n"
-            ": quality\n"
-            "---\n\n# Flat Legacy API Unsupported YAML\n",
-        )
-    return target
-
-
 def build_flat_openai_metadata_zip(tmp: Path) -> Path:
     """Flat ZIP roots use a temporary directory, never an identity source."""
     target = tmp / "flat-openai-metadata.zip"
@@ -1365,39 +1166,6 @@ def build_oversized_zip(tmp: Path) -> Path:
             "---\n\n# Big Skill\n",
         )
         archive.writestr("big-skill/blob.bin", b"\x00" * (limit + 4096))
-    return target
-
-
-def build_legacy_api_over_upload_limit_zip(tmp: Path) -> Path:
-    """Exceeds Legacy API's documented 30 MB maximum before extraction."""
-    target = tmp / "legacy-api-too-large.zip"
-    limit = 30 * 1024 * 1024
-    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_STORED) as archive:
-        archive.writestr(
-            "api-skill/SKILL.md",
-            "---\nname: api-skill\n"
-            "description: evaluate Legacy API upload limits for target-aware inspector regression testing only.\n"
-            "---\n\n# API Skill\n",
-        )
-        archive.writestr("api-skill/blob.bin", b"\x00" * (limit + 4096))
-    return target
-
-
-def build_legacy_api_upload_band_zip(tmp: Path) -> Path:
-    """A valid ZIP between the former 25 MiB cap and Legacy API's 30 MB limit."""
-    target = tmp / "legacy-api-upload-band.zip"
-    payload = b"\x00" * (13 * 1024 * 1024)
-    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_STORED) as archive:
-        archive.writestr(
-            "api-band-skill/SKILL.md",
-            "---\nname: api-band-skill\n"
-            "description: evaluate packages in the Legacy API upload size band for self-test fixtures.\n"
-            "---\n\n# API Band Skill\n",
-        )
-        archive.writestr("api-band-skill/blob-a.bin", payload)
-        archive.writestr("api-band-skill/blob-b.bin", payload)
-    if not 25 * 1024 * 1024 < target.stat().st_size < 30_000_000:
-        raise RuntimeError(f"fixture is outside the intended upload band: {target.stat().st_size}")
     return target
 
 
@@ -2242,57 +2010,11 @@ def check_deep_yaml_is_structured_unverified(data: dict[str, Any]) -> tuple[bool
     return True, ""
 
 
-def check_flat_legacy_api_unsupported_yaml(data: dict[str, Any]) -> tuple[bool, str]:
-    ok, reason = check_unsupported_yaml_is_unverified(data)
-    if not ok:
-        return ok, reason
-    if not has_code(data, "target_zip_root_layout_invalid"):
-        return False, "unsupported frontmatter bypassed the Legacy API wrapped-root check"
-    return True, ""
-
-
-def check_target(data: dict[str, Any], target: str) -> tuple[bool, str]:
-    if data.get("target") != target:
-        return False, f"expected target {target!r}, got {data.get('target')!r}"
-    return True, ""
-
-
-def check_legacy_profile(data: dict[str, Any]) -> tuple[bool, str]:
-    ok, reason = check_target(data, "legacy")
-    if not ok:
-        return ok, reason
-    codes = {item.get("code") for item in iter_findings(data)}
-    if "frontmatter_name_missing" in codes or "frontmatter_unexpected_keys" in codes:
-        return False, f"Legacy profile inherited portable-only requirements: {codes!r}"
-    return True, ""
-
-
 def check_canonical_target(data: dict[str, Any], target: str) -> tuple[bool, str]:
     if data.get("requested_target") != target or data.get("canonical_target") != target:
         return False, f"expected requested/canonical target {target!r}, got {data.get('requested_target')!r}/{data.get('canonical_target')!r}"
     if data.get("target_alias_used"):
         return False, "canonical target was reported as an alias"
-    return True, ""
-
-
-def check_openai_profile(data: dict[str, Any]) -> tuple[bool, str]:
-    ok, reason = check_target(data, "openai")
-    if not ok:
-        return ok, reason
-    if has_code(data, "frontmatter_name_reserved_for_legacy"):
-        return False, "OpenAI profile inherited the Legacy reserved-name restriction"
-    if not has_code(data, "openai_metadata_missing"):
-        return False, "expected advisory OpenAI metadata finding for a package without agents/openai.yaml"
-    return True, ""
-
-
-def check_legacy_ignores_openai_metadata(data: dict[str, Any]) -> tuple[bool, str]:
-    ok, reason = check_target(data, "legacy")
-    if not ok:
-        return ok, reason
-    leaked = sorted(item.get("code") for item in iter_findings(data) if str(item.get("code", "")).startswith("openai_metadata_"))
-    if leaked:
-        return False, f"Legacy target evaluated irrelevant OpenAI metadata: {leaked!r}"
     return True, ""
 
 
@@ -2409,17 +2131,6 @@ def check_oversized_zip_not_opened(data: dict[str, Any]) -> tuple[bool, str]:
         return False, "expected package_zip_too_large"
     if has_code(data, "zip_member_too_large"):
         return False, "archive was opened despite the pre-open size gate (zip_member_too_large present)"
-    return True, ""
-
-
-def check_legacy_api_upload_band(data: dict[str, Any]) -> tuple[bool, str]:
-    zip_bytes = data.get("zip_bytes")
-    if not isinstance(zip_bytes, int) or not 25 * 1024 * 1024 < zip_bytes < 30_000_000:
-        return False, f"expected ZIP in the 25 MiB-30 MB upload band, got {zip_bytes!r}"
-    if data.get("canonical_target") != "legacy-api":
-        return False, f"expected legacy-api target, got {data.get('canonical_target')!r}"
-    if has_code(data, "package_zip_too_large") or has_code(data, "target_upload_limit_exceeded"):
-        return False, f"valid Legacy API upload-band fixture was rejected: {data.get('summary')!r}"
     return True, ""
 
 
@@ -2546,16 +2257,6 @@ def check_portability_error_preserves_coverage(data: dict[str, Any]) -> tuple[bo
         return False, "a portability defect incorrectly marked safety-scan coverage incomplete"
     if has_code(data, "scan_coverage_incomplete"):
         return False, "a portability defect emitted scan_coverage_incomplete"
-    return True, ""
-
-
-def check_legacy_code_local_path_warning(data: dict[str, Any]) -> tuple[bool, str]:
-    if severity_of(data, "directory_nonportable_path") != "warning":
-        return False, "Legacy Code direct-folder path issue was not a warning"
-    if data.get("canonical_target") != "legacy-code":
-        return False, f"unexpected canonical target: {data.get('canonical_target')!r}"
-    if data.get("summary", {}).get("strict_pass") is not True:
-        return False, "a host-local Legacy Code path warning blocked strict pass"
     return True, ""
 
 
@@ -3820,7 +3521,7 @@ def run_evidence_semantics_contract_regression_case() -> dict[str, Any]:
             "required_evidence"
         ] = [
             "For a Skill Forge Release ZIP, exact-artifact package_skill.py verification "
-            "across all five canonical profiles; for Mutable source checkout, explicit "
+            "across portable and openai profiles; for Mutable source checkout, explicit "
             "packaging authority plus an archive built from a committed revision"
         ]
         g23_evidence_issues: list[str] = []
@@ -3970,45 +3671,6 @@ def run_routing_fixture_case() -> dict[str, Any]:
         "expected_exit": 0,
         "actual_exit": 0 if ok else 1,
         "expected_code": "phased Repair and independent profile routing",
-        "result": "PASS" if ok else "FAIL",
-        "reason": reason,
-    }
-
-
-def run_legacy_alias_equivalence_case(workdir: Path) -> dict[str, Any]:
-    """The retired --target legacy spelling must remain behaviorally stable."""
-    skill = build_legacy_profile_skill(workdir)
-
-    def inspect_for(target: str) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
-        proc = subprocess.run(
-            [sys.executable, "-S", str(SCRIPT), str(skill), "--json", "--strict", "--target", target],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            timeout=30,
-        )
-        return proc, json.loads(proc.stdout)
-
-    alias_proc, alias_data = inspect_for("legacy")
-    canonical_proc, canonical_data = inspect_for("legacy-code")
-    alias_findings = sorted((item.get("severity"), item.get("code"), item.get("message")) for item in iter_findings(alias_data))
-    canonical_findings = sorted((item.get("severity"), item.get("code"), item.get("message")) for item in iter_findings(canonical_data))
-    ok = (
-        alias_proc.returncode == canonical_proc.returncode == 0
-        and alias_findings == canonical_findings
-        and alias_data.get("requested_target") == "legacy"
-        and alias_data.get("canonical_target") == "legacy-code"
-        and alias_data.get("target_alias_used") is True
-        and isinstance(alias_data.get("target_deprecation_note"), str)
-        and canonical_data.get("target_alias_used") is False
-    )
-    reason = "" if ok else f"alias result was not equivalent: alias={alias_data}, canonical={canonical_data}"
-    return {
-        "name": "deprecated Legacy target alias matches legacy-code",
-        "expected_exit": 0,
-        "actual_exit": max(alias_proc.returncode, canonical_proc.returncode),
-        "expected_code": "target alias/deprecation fields",
         "result": "PASS" if ok else "FAIL",
         "reason": reason,
     }

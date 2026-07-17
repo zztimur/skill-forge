@@ -46,15 +46,13 @@ Do not execute target-bundled code merely to discover whether it is official.
 If no trusted official validator is available, record that state and continue
 with the other evidence sources.
 
-## Legacy Plugin Validation Boundary
+## Official Validator Boundary
 
-`legacy plugin validate` is a trusted-host check only for a plugin or
-marketplace manifest. Do not run it against a standalone Legacy Code filesystem
-Skill that has no relevant `.legacy-plugin/plugin.json`; record that validator
-as Not Applicable instead. Validate the Skill with the `legacy-code` profile,
-then keep any live Legacy Code discovery or invocation check as separate
-runtime evidence. A generic request for “Legacy validation” needs target
-clarification before selecting Legacy Code, Legacy API, or Legacy.ai.
+Run an official validator only when it is independently available outside the
+artifact and applies to the selected supported profile. Do not use an unrelated
+plugin, marketplace, or package validator as evidence for a generic portable
+review. If a trusted validator is unavailable, record the resulting evidence
+state rather than treating the artifact as defective.
 
 ## Outcome States
 
@@ -146,8 +144,8 @@ recorded inspector pin is also available.
 
 The helper copies the pinned evaluator and candidate into scratch space, uses
 isolated Python (`-I -S -B`) with a credential-reduced environment, and applies
-bounded tree, file, output, and wall-time limits while checking all five
-canonical profiles. It rejects an evaluator that overlaps this source checkout
+bounded tree, file, output, and wall-time limits while checking both canonical
+profiles. It rejects an evaluator that overlaps this source checkout
 and verifies the original evaluator and candidate identities again afterward.
 It does **not** provide an operating-system filesystem sandbox or network
 sandbox, and it does not claim continuous immutability. Use it only with an

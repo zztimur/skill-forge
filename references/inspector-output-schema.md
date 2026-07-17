@@ -12,11 +12,11 @@ The inspector is deterministic evidence collection, not the full audit. Always c
 | `input` | Original path passed to the inspector. |
 | `input_exists` | Whether the path exists. |
 | `input_type` | One of `zip`, `directory`, or `other`. |
-| `target` | Backward-compatible requested target spelling. It remains `legacy` when the deprecated alias was used. |
+| `target` | Backward-compatible requested target spelling. For supported profiles it matches `requested_target` and `canonical_target`. |
 | `requested_target` | Exact target spelling supplied to `--target`. |
-| `canonical_target` | Canonical profile actually evaluated: `portable`, `openai`, `legacy-code`, `legacy-api`, or `legacy-ai`. |
-| `target_alias_used` | `true` only when a temporary alias was requested. |
-| `target_deprecation_note` | Deprecation guidance for an alias request; otherwise `null`. |
+| `canonical_target` | Canonical profile actually evaluated: `portable` or `openai`. |
+| `target_alias_used` | `false` for the supported profiles. Retained for schema compatibility. |
+| `target_deprecation_note` | Reserved schema field; `null` for the supported profiles. |
 | `target_profile` | Non-finding summary of the active profile's layout requirements and documented product upload limit, if one is known. |
 | `summary` | Backward-compatible machine summary with `status`, `strict_pass`, finding counts, and finding codes. Present in JSON output for release gates and CI integrations. |
 | `unpack_error` | Error string when the input cannot be safely unpacked or inspected. |
@@ -46,7 +46,7 @@ The inspector is deterministic evidence collection, not the full audit. Always c
 | `dangerous_command_findings` | Findings for high-confidence destructive commands in bundled shell, PowerShell, Windows batch, Python, and JavaScript/TypeScript scripts. Findings inside or outside the Skill root are errors. |
 | `dangerous_command_note` | Reminder that dangerous-command scanning is heuristic and non-exhaustive across shell, PowerShell, Windows batch, Python, and JavaScript/TypeScript, but high-confidence findings and executable code outside the root fail strict validation. |
 | `strict_mode_note` | Summary of how `--strict` treats error-level findings, incomplete scan coverage, and unverified critical manifests. |
-| `effective_limits` | Safety, scan, and output limits used for this run. `max_input_zip_bytes`, `inspector_input_zip_limit_bytes`, and legacy `skill_upload_limit_bytes` are Skill Forge safety boundaries; `target_product_upload_limit_bytes` is a documented host limit when available. |
+| `effective_limits` | Safety, scan, and output limits used for this run. `max_input_zip_bytes`, `inspector_input_zip_limit_bytes`, and the retained `skill_upload_limit_bytes` compatibility field are Skill Forge safety boundaries; `target_product_upload_limit_bytes` is a documented host limit when available. |
 
 ## Summary Field
 
@@ -131,7 +131,7 @@ The inspector uses conservative defaults for normal Skill audits and includes th
 | derived | `safety_scans_read_full_eligible_files` | `true` | `true` when no exploratory safety cap was requested; eligible files are then read completely within the package preflight limits. |
 | derived | `inspector_input_zip_limit_bytes` | `30000000` | Active Skill Forge pre-open ZIP safety boundary; not a platform upload claim. |
 | derived | `skill_upload_limit_bytes` | `30000000` | Backward-compatible name for the same Skill Forge pre-open ZIP safety boundary; never a platform upload claim. |
-| derived | `target_product_upload_limit_bytes` | `null` except `legacy-api` | Documented target upload limit. Legacy API currently reports `30000000` (30 MB); `null` means this inspector has no documented product byte limit to enforce. |
+| derived | `target_product_upload_limit_bytes` | `null` | No supported profile currently encodes a documented product upload limit. |
 <!-- inspector-limits-table:end -->
 
 ### Effective Limits Field Contract
@@ -157,7 +157,7 @@ upload limit.
 | `max_read_bytes` | Active display/template-read cap. |
 | `max_safety_scan_bytes` | Optional exploratory safety-scan cap. |
 | `safety_scans_read_full_eligible_files` | Whether safety scans read every eligible bounded file fully. |
-| `skill_upload_limit_bytes` | Legacy alias for the inspector ZIP safety boundary. |
+| `skill_upload_limit_bytes` | Retained compatibility name for the inspector ZIP safety boundary. |
 | `inspector_input_zip_limit_bytes` | Explicit inspector ZIP safety boundary. |
 | `tree_limit` | Active tree-output entry cap. |
 | `target_product_upload_limit_bytes` | Documented selected-target product upload limit, if any. |
@@ -223,7 +223,7 @@ For ZIP inputs, the inspector scans every member that passes the configured arch
 | `zip_missing_top_level_skill_folder` | The archive has no top-level folder named after the skill; `SKILL.md` sits at the archive root. Warning; `expected` carries the intended folder name. |
 | `zip_read_error` | The ZIP could not be read from disk (I/O or stat error). |
 | `package_zip_too_large` | The ZIP file on disk exceeds Skill Forge's pre-open inspector safety limit; the archive is refused before it is opened. It is not a platform upload-limit claim. |
-| `target_upload_limit_exceeded` | The ZIP exceeds a documented product upload limit for the selected target. Currently emitted for `legacy-api` above 30 MB. |
+| `target_upload_limit_exceeded` | Reserved finding code for a documented product upload limit. No supported profile currently emits it. |
 
 ### Direct Folder Safety
 
@@ -232,9 +232,9 @@ For ZIP inputs, the inspector scans every member that passes the configured arch
 | `directory_root_symlink` | The input folder path itself is a symlink. |
 | `directory_symlink_found` | A symlink exists inside the directory tree. |
 | `directory_file_outside_root` | A file resolves outside the inspected root. |
-| `directory_nonportable_path` | A direct-folder entry violates the shared cross-platform path policy. `path_rule` identifies the rule. Error for portable and upload profiles; warning for a host-local Legacy Code folder. |
-| `directory_portable_identity_collision` | Direct-folder entries collide by case-folded or Unicode-normalized identity. `identity_kind` identifies the collision. Error for portable and upload profiles; warning for a host-local Legacy Code folder. |
-| `directory_file_directory_prefix_conflict` | A direct-folder file has the same portable identity as an ancestor directory of another entry. Error for portable and upload profiles; warning for a host-local Legacy Code folder. |
+| `directory_nonportable_path` | A direct-folder entry violates the shared cross-platform path policy. `path_rule` identifies the rule. It is an error for supported profiles. |
+| `directory_portable_identity_collision` | Direct-folder entries collide by case-folded or Unicode-normalized identity. `identity_kind` identifies the collision. It is an error for supported profiles. |
+| `directory_file_directory_prefix_conflict` | A direct-folder file has the same portable identity as an ancestor directory of another entry. It is an error for supported profiles. |
 | `directory_too_many_files` | Direct folder input has too many files. |
 | `directory_file_too_large` | Direct folder file exceeds the configured per-file limit. |
 | `directory_total_size_too_large` | Direct folder total size exceeds the configured limit. |
@@ -268,15 +268,9 @@ For ZIP inputs, the inspector scans every member that passes the configured arch
 | `frontmatter_invalid_name` | `name` is not lowercase hyphen-case. |
 | `frontmatter_name_too_long` | `name` exceeds the 64-character Agent Skills compatibility limit. |
 | `frontmatter_name_directory_mismatch` | Skill directory name does not match the frontmatter `name`. |
-| `frontmatter_name_directory_comparison_invalid` | Legacy.ai's Unicode-aware directory/name comparison produced an empty identity key, so the names cannot be safely compared. |
-| | `name` contains `legacy` or `provider` in a profile that documents those reserved words (`portable` conservative baseline or `legacy-api`). |
 | `frontmatter_description_missing` | `description` is absent or not a string. |
 | `frontmatter_description_angle_brackets` | Description contains angle brackets. |
 | `frontmatter_description_short` | Description may be too short to trigger reliably. |
-| | Portable-profile advisory: description exceeds Legacy.ai's 200-character custom-Skill limit. Validate `legacy-ai` for an enforcing error. |
-| | Legacy.ai profile description exceeds its documented 200-character limit. |
-| | Legacy API profile description exceeds its documented 1,024-character limit. |
-| `target_zip_root_layout_invalid` | `legacy-api` or `legacy-ai` ZIP does not contain exactly one top-level skill directory as required by that profile. |
 | `frontmatter_description_weak_trigger` | Description may not clearly explain when to use the Skill. |
 | `frontmatter_platform_optional_keys` | Optional platform-specific frontmatter keys are present (`dependencies`, `license`, `allowed-tools`, `metadata`, `version`); info only — validate against the target host. Genuinely unknown keys are still `frontmatter_unexpected_keys`. |
 | `openai_metadata_unreadable` | `agents/openai.yaml`, when present, cannot be read as text. |
@@ -295,8 +289,7 @@ For ZIP inputs, the inspector scans every member that passes the configured arch
 | `openai_metadata_icon_missing` | An optional OpenAI icon path does not exist. |
 
 When `agents/openai.yaml` exists, the inspector applies these checks to both
-the `openai` and `portable` profiles. `legacy-code`, `legacy-api`, and
-`legacy-ai` do not validate this OpenAI-specific UI metadata.
+the `openai` and `portable` profiles.
 
 The restricted parser fully validates its supported subset, including duplicate
 keys and malformed scalars, with a 64-level nesting bound. When it encounters

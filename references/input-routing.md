@@ -44,23 +44,16 @@ For a portfolio or multi-Skill review, inspect each Skill independently and give
 | Evidence from request or artifact | Inspector profile | Reporting rule |
 |---|---|---|
 | OpenAI-specific packaging or UI workflow | `--target openai` | Scope findings to OpenAI. |
-| Legacy Code filesystem Skill | `--target legacy-code` | Scope findings to Legacy Code. |
-| Legacy API upload/package | `--target legacy-api` | Scope findings to Legacy API upload rules. |
-| Legacy.ai custom-Skill ZIP | `--target legacy-ai` | Scope findings to Legacy.ai custom-Skill rules. |
 | Generic Agent Skill or no host named | `--target portable` | State that the portability profile was selected; do not imply host-specific validation. |
-| Two or more named host surfaces | One invocation per named canonical profile | Preserve one compatibility result and release verdict per profile; do not collapse named hosts into `portable`. |
+| A request that names both supported surfaces | One invocation per supported canonical profile | Preserve one compatibility result and release verdict per profile; do not collapse `openai` into `portable`. |
 
-`--target legacy` is a temporary deprecated alias for `--target legacy-code`, not a generic Legacy profile. If the user names a target that cannot be verified locally, retain the selected profile as an assumption and separate it from verified official-validator evidence.
+When a request names an unsupported host surface, use `--target portable` for
+the shared baseline and report host-specific validation as Not Assessed. Do not
+invent a target name or imply that the portable result certifies that host.
 
-“Legacy” by itself is not enough to select a host-specific profile. Ask whether
-the request concerns Legacy Code, a Legacy API upload bundle, or a Legacy.ai
-custom-Skill ZIP. Do not map generic wording to `--target legacy`. If that
-surface cannot be determined, use `--target portable` and report
-Legacy-specific validation as Not Assessed.
-
-When multiple host surfaces are requested, inspect each canonical profile
+When both supported surfaces are requested, inspect each canonical profile
 independently. A portable result is useful shared-baseline evidence, but it is
-not a replacement for a named host profile and cannot certify any host. Keep a
+not a replacement for `openai` and cannot certify any host. Keep a
 passing profile intact when another profile fails or remains Not Assessed, and
 derive any overall summary without hiding the weaker member result.
 

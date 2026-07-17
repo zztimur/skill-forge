@@ -94,7 +94,7 @@ local-only metadata that a central-directory-only parser would not expose.
 Runtime member metadata and declared sizes are validated before payload reads.
 
 These rules make two builds from the same committed revision byte-for-byte
-reproducible. A legacy `git archive` ZIP is not canonical even when its file
+reproducible. A plain `git archive` ZIP is not canonical even when its file
 contents happen to match.
 
 ## Evidence Boundary

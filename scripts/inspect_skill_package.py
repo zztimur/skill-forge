@@ -438,7 +438,7 @@ class InspectionLimits:
             "max_read_bytes": self.max_read_bytes,
             "max_safety_scan_bytes": self.max_safety_scan_bytes,
             "safety_scans_read_full_eligible_files": self.max_safety_scan_bytes is None,
-            # Kept as a legacy JSON key for existing consumers. It is an
+            # Kept as a backward-compatible JSON key for existing consumers. It is an
             # inspector resource boundary, never a claim about a host upload
             # product limit.
             "skill_upload_limit_bytes": self.max_input_zip_bytes,
