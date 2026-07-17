@@ -6,6 +6,11 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+### Fixed
+
+- Normalized contract reference identities to POSIX paths so Windows validation
+  recognizes the shipped reference files consistently.
+
 ## [v2.0.0] - 2026-07-17
 
 ### Added

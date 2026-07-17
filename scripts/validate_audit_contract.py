@@ -13,7 +13,7 @@ import ast
 import json
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, List, Mapping, Optional, Sequence
 
 from package_skill import FORBIDDEN_RUNTIME_PATHS
@@ -276,17 +276,23 @@ def load_contract_json(text: str) -> Any:
     return json.loads(text, object_pairs_hook=reject_duplicate_json_keys)
 
 
+def repo_relative(path: PurePath, root: PurePath = REPO_ROOT) -> str:
+    """Return one canonical POSIX identity below the repository root."""
+
+    return path.relative_to(root).as_posix()
+
+
 def read_text(path: Path, issues: List[str]) -> str:
     try:
         return path.read_text(encoding="utf-8")
     except OSError as exc:
-        issues.append(f"cannot read {path.relative_to(REPO_ROOT)}: {exc}")
+        issues.append(f"cannot read {repo_relative(path)}: {exc}")
         return ""
 
 
 def add_if_missing(text: str, token: str, location: Path, issues: List[str]) -> None:
     if token not in text:
-        issues.append(f"{location.relative_to(REPO_ROOT)} is missing {token!r}")
+        issues.append(f"{repo_relative(location)} is missing {token!r}")
 
 
 def require_mapping(value: Any, label: str, issues: List[str]) -> Mapping[str, Any]:
@@ -1244,7 +1250,7 @@ def validate_skill_control_plane(issues: List[str]) -> None:
                 issues.append(f"{path} is classified in more than one reference role section")
             classified[path] = heading
     shipped_references = {
-        str(path.relative_to(REPO_ROOT))
+        repo_relative(path)
         for path in (REPO_ROOT / "references").iterdir()
         if path.is_file()
     }
@@ -1320,7 +1326,7 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
         for label in EXPECTED_EVIDENCE:
             add_if_missing(text, label, document, issues)
         if "Not Applicable" not in text or "rationale" not in text.lower():
-            issues.append(f"{document.relative_to(REPO_ROOT)} must support Not Applicable with a rationale")
+            issues.append(f"{repo_relative(document)} must support Not Applicable with a rationale")
 
     for document in (RUBRIC_PATH, TEMPLATE_PATH, EXAMPLE_PATH):
         text = texts[document]
@@ -1564,7 +1570,7 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
         add_if_missing(normalized, sandbox_policy, document, issues)
         add_if_missing(normalized, sandbox_fallback, document, issues)
         if "where possible" in texts[document].lower():
-            issues.append(f"{document.relative_to(REPO_ROOT)} must not weaken sandbox controls with 'where possible'")
+            issues.append(f"{repo_relative(document)} must not weaken sandbox controls with 'where possible'")
 
     standard_release_markers = {
         RUBRIC_PATH: ("without loading the full Release contract", "source contract validator keeps"),
@@ -1606,7 +1612,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     validate_runtime_boundary_contract(issues)
     report = {
         "status": "pass" if not issues else "fail",
-        "contract": str(CONTRACT_PATH.relative_to(REPO_ROOT)),
+        "contract": repo_relative(CONTRACT_PATH),
         "issue_count": len(issues),
         "issues": issues,
     }

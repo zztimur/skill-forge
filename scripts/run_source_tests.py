@@ -18,7 +18,7 @@ import sys
 import tempfile
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 
@@ -1334,6 +1334,32 @@ def run_runtime_surface_split_case() -> dict[str, Any]:
     }
 
 
+def run_cross_platform_contract_path_case() -> dict[str, Any]:
+    """Keep repository-relative contract identities portable on Windows."""
+
+    try:
+        validator = load_module(
+            CONTRACT_VALIDATOR, "skill_forge_contract_path_identity_tests"
+        )
+        root = PureWindowsPath("D:/repo")
+        reference = root / "references" / "audit-contract.json"
+        actual = validator.repo_relative(reference, root)
+        ok = actual == "references/audit-contract.json"
+        reason = "" if ok else f"unexpected canonical reference path: {actual!r}"
+    except Exception as exc:
+        ok = False
+        reason = f"contract path regression raised {type(exc).__name__}: {exc}"
+    return {
+        "name": "contract reference identities stay POSIX on Windows",
+        "fixture": str(CONTRACT_VALIDATOR),
+        "expected_exit": 0,
+        "actual_exit": 0 if ok else 1,
+        "expected_code": "cross-platform reference identity",
+        "result": "PASS" if ok else "FAIL",
+        "reason": reason,
+    }
+
+
 def render_results(results: list[dict[str, Any]]) -> int:
     headers = ["Test", "Expected", "Actual", "Finding", "Result", "Reason"]
     rows = [
@@ -1395,6 +1421,7 @@ def main() -> int:
         ("strict release-tag and committed-changelog tests", run_release_tag_verification_case),
         ("independent evaluator scratch-boundary tests", run_independent_evaluator_case),
         ("runtime/source test boundary", run_runtime_surface_split_case),
+        ("cross-platform contract path identity", run_cross_platform_contract_path_case),
     )
     results = []
     for label, case in cases:
