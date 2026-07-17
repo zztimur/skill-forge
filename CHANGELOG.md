@@ -6,6 +6,8 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+## [v1.0.0] - 2026-07-17
+
 ### Changed
 
 - Re-established Skill Forge as a clean v1 release with portable and OpenAI as

@@ -3939,11 +3939,19 @@ def run_routing_fixture_case() -> dict[str, Any]:
             and all(verb in routing for verb in ("fix", "correct", "rewrite", "refactor"))
             and all(fixture in matrix for fixture in fixtures)
             and matrix.count("| Repair |") >= len(fixtures)
-            and all(surface in routing for surface in ("legacy code", "legacy api", "legacy.ai"))
-            and "do not map generic wording to `--target legacy`" in routing
-            and "plugin or marketplace manifest" in compatibility
-            and "standalone legacy code filesystem" in validator_evidence
-            and "do not map generic wording to `--target" in skill
+            and all(
+                surface in routing
+                for surface in (
+                    "openai-specific packaging",
+                    "generic agent skill or no host named",
+                    "portable",
+                )
+            )
+            and "do not imply host-specific validation" in routing
+            and "shared baseline, not host certification" in matrix
+            and "openai metadata" in compatibility
+            and "generic or unspecified agent skills" in skill
+            and "not host certification" in skill
             and "ordered phases" in routing
             and "affirmative directive" in routing
             and "independent" in compatibility
