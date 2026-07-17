@@ -6,6 +6,8 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+## [v1.0.1] - 2026-07-17
+
 ### Changed
 
 - Aligned the documentation, release contract, and regression harness with the
