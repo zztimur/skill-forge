@@ -6,6 +6,8 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+## [v2.0.1] - 2026-07-17
+
 ### Fixed
 
 - Normalized contract reference identities to POSIX paths so Windows validation
