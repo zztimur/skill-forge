@@ -285,6 +285,7 @@ FINDING_CODE_CATALOG = (
     "zip_bad_archive",
     "zip_case_collision_member",
     "zip_control_character_member",
+    "zip_directory_member_has_payload",
     "zip_duplicate_member",
     "zip_encrypted_member",
     "zip_file_directory_prefix_conflict_member",
@@ -1229,6 +1230,26 @@ def zip_info_unsupported_type(info: zipfile.ZipInfo) -> bool:
     return file_type != stat.S_IFDIR or not info.is_dir()
 
 
+def zip_directory_payload_metadata(info: zipfile.ZipInfo) -> bool:
+    """Whether a directory entry declares non-empty uncompressed content.
+
+    A valid deflated empty stream may have a nonzero ``compress_size``, so that
+    field is deliberately not used as a rejection signal.
+    """
+    return info.is_dir() and (info.file_size != 0 or info.CRC != 0)
+
+
+def zip_directory_stream_is_empty(
+    archive: zipfile.ZipFile,
+    info: zipfile.ZipInfo,
+) -> bool:
+    """Verify a directory stream is empty with a one-byte bounded read."""
+    if not info.is_dir():
+        return True
+    with archive.open(info, "r") as source:
+        return source.read(1) == b""
+
+
 def zip_member_safety_error(info: zipfile.ZipInfo, limits: InspectionLimits) -> Optional[str]:
     """Return a concise extraction-time error for an unsafe member, if any.
 
@@ -1246,6 +1267,8 @@ def zip_member_safety_error(info: zipfile.ZipInfo, limits: InspectionLimits) -> 
         return f"zip contains symlink member: {info.filename}"
     if zip_info_unsupported_type(info):
         return f"zip contains unsupported special member: {info.filename}"
+    if zip_directory_payload_metadata(info):
+        return f"zip_directory_member_has_payload: directory member is not empty: {info.filename}"
     if info.file_size > limits.max_zip_member_bytes:
         return f"zip member exceeds size limit: {info.filename}"
     return None
@@ -1318,6 +1341,30 @@ def validate_zip_archive(zip_path: Path, limits: InspectionLimits, profile: Targ
                     findings.append(finding("error", "zip_symlink_member", "zip contains symlink member", file=raw))
                 elif zip_info_unsupported_type(info):
                     findings.append(finding("error", "zip_unsupported_member_type", "zip contains a special member type that cannot be extracted safely", file=raw))
+                directory_payload = zip_directory_payload_metadata(info)
+                if (
+                    info.is_dir()
+                    and not directory_payload
+                    and not (info.flag_bits & 0x1)
+                    and not zip_info_is_symlink(info)
+                    and not zip_info_unsupported_type(info)
+                ):
+                    try:
+                        directory_payload = not zip_directory_stream_is_empty(archive, info)
+                    except Exception:
+                        # Archive-controlled compression/decompression failures
+                        # are evidence that the directory cannot be proven empty.
+                        directory_payload = True
+                if directory_payload:
+                    findings.append(finding(
+                        "error",
+                        "zip_directory_member_has_payload",
+                        "zip directory member must have an empty uncompressed stream",
+                        file=raw,
+                        bytes=info.file_size,
+                        compressed_bytes=info.compress_size,
+                        crc32=f"{info.CRC:08x}",
+                    ))
                 if info.file_size > limits.max_zip_member_bytes:
                     findings.append(finding("error", "zip_member_too_large", "zip member exceeds size limit", file=raw, bytes=info.file_size, limit=limits.max_zip_member_bytes))
                 total_uncompressed += info.file_size
@@ -1360,6 +1407,24 @@ def safe_extract_zip(zip_path: Path, destination: Path, limits: InspectionLimits
             safety_error = zip_member_safety_error(info, limits)
             if safety_error:
                 raise ValueError(safety_error)
+        for info in infos:
+            if not info.is_dir():
+                continue
+            try:
+                stream_is_empty = zip_directory_stream_is_empty(archive, info)
+            except Exception as exc:
+                # Convert every archive-controlled stream failure into the
+                # same fail-closed extraction boundary without exposing a
+                # target-specific traceback.
+                raise ValueError(
+                    "zip_directory_member_has_payload: could not verify empty directory stream: "
+                    f"{info.filename}"
+                ) from exc
+            if not stream_is_empty:
+                raise ValueError(
+                    "zip_directory_member_has_payload: directory member stream is not empty: "
+                    f"{info.filename}"
+                )
 
         created_files: List[Path] = []
         created_directories: List[Path] = []

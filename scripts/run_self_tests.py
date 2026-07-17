@@ -733,6 +733,71 @@ def build_zip_special_member(tmp: Path) -> Path:
     return target
 
 
+def build_directory_member_zip(
+    tmp: Path,
+    *,
+    compression: int,
+    payload: bytes,
+) -> Path:
+    """Build a valid Skill ZIP with one explicit directory entry."""
+    compression_name = "stored" if compression == zipfile.ZIP_STORED else "deflated"
+    payload_name = "payload" if payload else "empty"
+    target = tmp / f"directory-member-{compression_name}-{payload_name}.zip"
+    with zipfile.ZipFile(target, "w") as archive:
+        archive.writestr(
+            "sample-skill/SKILL.md",
+            "---\nname: sample-skill\n"
+            "description: evaluate explicit ZIP directory members safely. use only for self-test fixtures.\n"
+            "---\n\n# Sample Skill\n",
+        )
+        info = zipfile.ZipInfo("sample-skill/references/hidden/")
+        info.create_system = 3
+        info.external_attr = (stat.S_IFDIR | 0o755) << 16 | 0x10
+        info.compress_type = compression
+        archive.writestr(info, payload)
+    with zipfile.ZipFile(target, "r") as archive:
+        written = archive.getinfo("sample-skill/references/hidden/")
+        if written.file_size != len(payload):
+            raise RuntimeError("directory-member fixture size metadata drifted")
+        if not payload and written.CRC != 0:
+            raise RuntimeError("empty directory-member fixture has a nonzero CRC")
+        if compression == zipfile.ZIP_DEFLATED and not payload and written.compress_size <= 0:
+            raise RuntimeError("deflated empty directory fixture lacks compressed framing bytes")
+    return target
+
+
+def build_stored_directory_payload_zip(tmp: Path) -> Path:
+    return build_directory_member_zip(
+        tmp,
+        compression=zipfile.ZIP_STORED,
+        payload=b"hidden directory payload\n",
+    )
+
+
+def build_deflated_directory_payload_zip(tmp: Path) -> Path:
+    return build_directory_member_zip(
+        tmp,
+        compression=zipfile.ZIP_DEFLATED,
+        payload=b"hidden directory payload\n",
+    )
+
+
+def build_stored_empty_directory_zip(tmp: Path) -> Path:
+    return build_directory_member_zip(
+        tmp,
+        compression=zipfile.ZIP_STORED,
+        payload=b"",
+    )
+
+
+def build_deflated_empty_directory_zip(tmp: Path) -> Path:
+    return build_directory_member_zip(
+        tmp,
+        compression=zipfile.ZIP_DEFLATED,
+        payload=b"",
+    )
+
+
 def build_encrypted_member_zip(tmp: Path) -> Path:
     """Set the central-directory encrypted bit without attempting decryption.
 
@@ -1917,6 +1982,28 @@ def check_valid_summary(data: dict[str, Any]) -> tuple[bool, str]:
     return True, ""
 
 
+def check_directory_payload_finding(data: dict[str, Any]) -> tuple[bool, str]:
+    item = next(
+        (
+            finding_item
+            for finding_item in iter_findings(data)
+            if finding_item.get("code") == "zip_directory_member_has_payload"
+        ),
+        {},
+    )
+    if not isinstance(item.get("bytes"), int) or item.get("bytes", 0) <= 0:
+        return False, f"directory payload finding lacks byte evidence: {item!r}"
+    if not isinstance(item.get("compressed_bytes"), int) or item.get("compressed_bytes", 0) <= 0:
+        return False, f"directory payload finding lacks compressed-byte evidence: {item!r}"
+    if item.get("crc32") in {None, "00000000"}:
+        return False, f"directory payload finding lacks nonzero CRC evidence: {item!r}"
+    if data.get("summary", {}).get("strict_pass") is not False:
+        return False, f"directory payload archive incorrectly strict-passed: {data.get('summary')!r}"
+    if data.get("unpack_error") != "zip preflight failed":
+        return False, f"directory payload was not rejected during preflight: {data.get('unpack_error')!r}"
+    return True, ""
+
+
 def run_streaming_extraction_limit_case(workdir: Path) -> dict[str, Any]:
     """Prove the copier enforces limits itself and leaves no partial file."""
     fixture = build_valid_skill_zip(workdir)
@@ -1961,11 +2048,13 @@ def run_rejected_portable_extraction_case(workdir: Path) -> dict[str, Any]:
         ("control character", build_control_character_member_zip, "zip_control_character_member"),
         ("Windows reserved basename", build_windows_reserved_name_zip, "zip_windows_reserved_name_member"),
         ("file-directory prefix conflict", build_file_directory_prefix_conflict_zip, "zip_file_directory_prefix_conflict_member"),
+        ("stored directory payload", build_stored_directory_payload_zip, "zip_directory_member_has_payload"),
+        ("deflated directory payload", build_deflated_directory_payload_zip, "zip_directory_member_has_payload"),
     )
     failures: list[str] = []
-    for name, builder, expected_code in fixtures:
+    for index, (name, builder, expected_code) in enumerate(fixtures):
         fixture = builder(workdir)
-        destination = workdir / f"rejected-{len(failures)}-{expected_code}"
+        destination = workdir / f"rejected-{index}-{expected_code}"
         try:
             inspector.safe_extract_zip(fixture, destination, inspector.InspectionLimits())
         except ValueError as exc:
@@ -3906,6 +3995,10 @@ def main() -> int:
         TestCase("safe non-ASCII ZIP member", build_safe_non_ascii_zip, 0),
         TestCase("ZIP symlink member", build_zip_symlink_member, 2, "zip_symlink_member"),
         TestCase("ZIP special member", build_zip_special_member, 2, "zip_unsupported_member_type"),
+        TestCase("stored ZIP directory payload", build_stored_directory_payload_zip, 2, "zip_directory_member_has_payload", checker=check_directory_payload_finding, expected_severity="error"),
+        TestCase("deflated ZIP directory payload", build_deflated_directory_payload_zip, 2, "zip_directory_member_has_payload", checker=check_directory_payload_finding, expected_severity="error"),
+        TestCase("stored empty ZIP directory", build_stored_empty_directory_zip, 0, checker=check_valid_summary),
+        TestCase("deflated empty ZIP directory", build_deflated_empty_directory_zip, 0, checker=check_valid_summary),
         TestCase("ZIP encrypted member", build_encrypted_member_zip, 2, "zip_encrypted_member"),
         TestCase("high-compression ZIP", build_high_compression_zip, 2, "zip_high_compression_ratio"),
         TestCase("sub-1 MB high-compression ZIP", build_small_high_compression_zip, 2, "zip_high_compression_ratio"),

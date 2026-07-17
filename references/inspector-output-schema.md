@@ -97,7 +97,7 @@ Common properties:
 | `code` | Stable machine-readable identifier. Audit reports may cite this code. |
 | `message` | Human-readable explanation. |
 | `file` | Relative file path when applicable. |
-| `limit`, `bytes`, `ratio`, `risk`, `pattern` | Optional evidence fields for size, compression, and secret findings. |
+| `limit`, `bytes`, `compressed_bytes`, `crc32`, `ratio`, `risk`, `pattern` | Optional evidence fields for size, compression, directory-stream identity, and secret findings. |
 | `expected` | Optional safe evidence for name/directory findings. For `zip_missing_top_level_skill_folder`, `expected` is the validated, non-sensitive skill name the archive's top-level folder should have used, or `null` when that value was suppressed. |
 | `keys`, `key_count`, `length`, `normalized_path`, `conflicts_with` | Optional evidence for recognized frontmatter keys, redacted unknown-key counts, length findings, and ZIP identity findings. `conflicts_with` identifies the earlier colliding member path. |
 
@@ -217,6 +217,7 @@ For ZIP inputs, the inspector scans every member that passes the configured arch
 | `zip_unsafe_member_path` | ZIP member uses an absolute path, traversal, or otherwise unsafe name. |
 | `zip_nonportable_separator_member` | ZIP member uses a backslash separator, which has different path semantics across hosts. |
 | `zip_control_character_member` | ZIP member path contains an unsafe control character. |
+| `zip_directory_member_has_payload` | A slash-suffixed directory member declares or yields non-empty uncompressed content, or cannot be verified as an empty stream. Empty stored and deflated directory entries remain valid; compressed size alone is not a rejection signal. |
 | `zip_windows_ads_member` | A ZIP path segment contains a colon and could address a Windows alternate data stream. |
 | `zip_windows_invalid_character_member` | A ZIP path segment contains `<`, `>`, `"`, `|`, `?`, or `*`, which Windows does not permit in file names. |
 | `zip_windows_trailing_dot_space_member` | A ZIP path segment ends in a space or period, which Windows ignores. |
@@ -388,7 +389,7 @@ their meaning.
 
 `skill_md_missing` `skill_md_multiple` `target_upload_limit_exceeded` `target_zip_root_layout_invalid` `template_marker_found`
 
-`zip_bad_archive` `zip_case_collision_member` `zip_control_character_member` `zip_duplicate_member` `zip_encrypted_member` `zip_file_directory_prefix_conflict_member` `zip_high_compression_ratio` `zip_member_too_large` `zip_missing_top_level_skill_folder` `zip_nonportable_separator_member` `zip_path_component_too_long` `zip_path_too_long` `zip_read_error` `zip_symlink_member` `zip_too_many_members` `zip_uncompressed_size_too_large` `zip_unicode_casefold_collision_member` `zip_unicode_normalization_collision_member` `zip_unsafe_member_path` `zip_unsupported_member_type` `zip_windows_ads_member` `zip_windows_invalid_character_member` `zip_windows_reserved_name_member` `zip_windows_trailing_dot_space_member` `zip_zero_compressed_size`
+`zip_bad_archive` `zip_case_collision_member` `zip_control_character_member` `zip_directory_member_has_payload` `zip_duplicate_member` `zip_encrypted_member` `zip_file_directory_prefix_conflict_member` `zip_high_compression_ratio` `zip_member_too_large` `zip_missing_top_level_skill_folder` `zip_nonportable_separator_member` `zip_path_component_too_long` `zip_path_too_long` `zip_read_error` `zip_symlink_member` `zip_too_many_members` `zip_uncompressed_size_too_large` `zip_unicode_casefold_collision_member` `zip_unicode_normalization_collision_member` `zip_unsafe_member_path` `zip_unsupported_member_type` `zip_windows_ads_member` `zip_windows_invalid_character_member` `zip_windows_reserved_name_member` `zip_windows_trailing_dot_space_member` `zip_zero_compressed_size`
 <!-- inspector-finding-catalog:end -->
 
 ## Minimal Successful Output Example
