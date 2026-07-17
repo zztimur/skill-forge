@@ -40,6 +40,7 @@ INSPECTION_SCHEMA_VERSION = 6
 ZIP_STREAM_CHUNK_BYTES = 1024 * 1024
 TEXT_SNIFF_BYTES = 8192
 MAX_YAML_NESTING_DEPTH = 64
+MAX_YAML_INTEGER_DIGITS = 4096
 PORTABLE_FRONTMATTER_KEYS = {"name", "description"}
 # These preserve the previous portable profile: fields are allowed because at
 # least one supported surface understands them, but are surfaced for review.
@@ -795,6 +796,38 @@ def parse_yaml_single_quoted(value: str, line_number: int) -> str:
     raise YamlParseError(line_number, "quoted scalar is not closed")
 
 
+def parse_yaml_integer(value: str, line_number: int) -> int:
+    digits = value[1:] if value.startswith(("-", "+")) else value
+    if len(digits) > MAX_YAML_INTEGER_DIGITS:
+        raise YamlParseError(
+            line_number,
+            f"integer numeric scalar exceeds the {MAX_YAML_INTEGER_DIGITS}-digit verifier limit",
+        )
+    try:
+        return int(value)
+    except (OverflowError, ValueError) as exc:
+        raise YamlParseError(
+            line_number,
+            "integer numeric scalar cannot be represented safely",
+        ) from exc
+
+
+def parse_yaml_float(value: str, line_number: int) -> float:
+    try:
+        parsed = float(value)
+    except (OverflowError, ValueError) as exc:
+        raise YamlParseError(
+            line_number,
+            "floating-point numeric scalar cannot be represented safely",
+        ) from exc
+    if not math.isfinite(parsed):
+        raise YamlParseError(
+            line_number,
+            "floating-point numeric scalar must be finite",
+        )
+    return parsed
+
+
 def parse_yaml_scalar(value: str, line_number: int, depth: int = 0) -> Any:
     if depth > MAX_YAML_NESTING_DEPTH:
         raise YamlUnsupportedSyntaxError(
@@ -854,10 +887,15 @@ def parse_yaml_scalar(value: str, line_number: int, depth: int = 0) -> Any:
         return lowered == "true"
     if lowered in {"null", "~"}:
         return None
+    if lowered in {".nan", "+.nan", "-.nan", ".inf", "+.inf", "-.inf"}:
+        raise YamlParseError(
+            line_number,
+            "floating-point numeric scalar must be finite",
+        )
     if re.fullmatch(r"[-+]?(?:0|[1-9][0-9]*)", value):
-        return int(value)
+        return parse_yaml_integer(value, line_number)
     if re.fullmatch(r"[-+]?(?:[0-9]+\.[0-9]*|\.[0-9]+)(?:[eE][-+]?[0-9]+)?", value) or re.fullmatch(r"[-+]?[0-9]+[eE][-+]?[0-9]+", value):
-        return float(value)
+        return parse_yaml_float(value, line_number)
     if re.search(r":(?=\s|$)", value):
         raise YamlParseError(line_number, "plain scalar contains a ':' mapping separator; quote the value")
     return value

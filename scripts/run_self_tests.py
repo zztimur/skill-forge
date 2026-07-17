@@ -38,6 +38,7 @@ FAKE_GITHUB_FINE_GRAINED_TOKEN = "github_pat_" + "A" * 82
 FAKE_LOWERCASE_OPENAI_KEY = "sk-" + "a" * 32
 FAKE_FRONTMATTER_PII = "fixture.user" + "@example.invalid"
 FAKE_FRONTMATTER_PRIVATE_VALUE = "private-customer-record-" + "R" * 16
+PATHOLOGICAL_YAML_INTEGER = "9" * 5000
 EXPECTED_SYNTHETIC_RUNTIME_ZIP_SHA256 = (
     "6f58a416a23d0dee5fe6e0a818febd49e57d39c043a7cc6f433e4f2b1ff28831"
 )
@@ -542,6 +543,23 @@ def build_deeply_nested_yaml_skill(tmp: Path) -> Path:
     lines.append("  " * 97 + "value: bounded")
     lines.extend(["---", "", "# Deep YAML Skill", ""])
     (skill / "SKILL.md").write_text("\n".join(lines), encoding="utf-8")
+    return skill
+
+
+def build_numeric_frontmatter_skill(tmp: Path, scalar: str) -> Path:
+    """Place one numeric-shaped scalar in optional metadata so parser
+    behavior is tested independently of required field type validation."""
+    skill = tmp / "numeric-frontmatter-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text(
+        "---\n"
+        "name: numeric-frontmatter-skill\n"
+        "description: evaluate bounded YAML numeric scalars without tracebacks or unsafe JSON values. use only for fixtures.\n"
+        "metadata:\n"
+        f"  sample: {scalar}\n"
+        "---\n\n# Numeric Frontmatter Skill\n",
+        encoding="utf-8",
+    )
     return skill
 
 
@@ -2222,6 +2240,34 @@ def check_deep_yaml_is_structured_unverified(data: dict[str, Any]) -> tuple[bool
     )
     if "nesting exceeds the verifier limit" not in str(finding_item.get("message", "")):
         return False, f"deep YAML did not return the bounded structured diagnostic: {finding_item!r}"
+    return True, ""
+
+
+def check_yaml_numeric_rejection(data: dict[str, Any]) -> tuple[bool, str]:
+    findings = [
+        item
+        for item in iter_findings(data)
+        if item.get("code") == "frontmatter_parse_error"
+    ]
+    if not findings:
+        return False, "unsafe YAML numeric scalar did not produce frontmatter_parse_error"
+    if findings[0].get("severity") != "error":
+        return False, f"numeric parse finding was not an error: {findings[0]!r}"
+    if "numeric scalar" not in str(findings[0].get("message", "")):
+        return False, f"numeric parse finding was not safely classified: {findings[0]!r}"
+    if data.get("summary", {}).get("strict_pass") is not False:
+        return False, f"unsafe YAML numeric scalar strict-passed: {data.get('summary')!r}"
+    return True, ""
+
+
+def check_valid_finite_yaml_number(data: dict[str, Any]) -> tuple[bool, str]:
+    if has_code(data, "frontmatter_parse_error"):
+        return False, "valid finite scientific notation was rejected"
+    frontmatter = data.get("frontmatter", {})
+    if frontmatter.get("value_types", {}).get("metadata") != "mapping":
+        return False, f"finite numeric metadata was not parsed as a mapping: {frontmatter!r}"
+    if data.get("summary", {}).get("strict_pass") is not True:
+        return False, f"valid finite scientific notation did not strict-pass: {data.get('summary')!r}"
     return True, ""
 
 
@@ -4073,6 +4119,13 @@ def main() -> int:
         TestCase("valid unsupported YAML blocks strict verification", build_unsupported_yaml_frontmatter_skill, 2, "frontmatter_yaml_unsupported", checker=check_unsupported_yaml_is_unverified, expected_severity="warning"),
         TestCase("finding-shaped frontmatter cannot forge findings", build_finding_shaped_frontmatter_metadata_skill, 0, checker=check_finding_shaped_metadata_is_ignored),
         TestCase("deep YAML returns bounded unverified evidence", build_deeply_nested_yaml_skill, 2, "frontmatter_yaml_unsupported", checker=check_deep_yaml_is_structured_unverified, expected_severity="warning"),
+        TestCase("positive YAML float overflow fails closed", lambda tmp: build_numeric_frontmatter_skill(tmp, "1e9999"), 2, "frontmatter_parse_error", checker=check_yaml_numeric_rejection, forbidden_output=("Traceback", "1e9999"), expected_severity="error"),
+        TestCase("negative YAML float overflow fails closed", lambda tmp: build_numeric_frontmatter_skill(tmp, "-1e9999"), 2, "frontmatter_parse_error", checker=check_yaml_numeric_rejection, forbidden_output=("Traceback", "-1e9999"), expected_severity="error"),
+        TestCase("YAML NaN spelling fails closed", lambda tmp: build_numeric_frontmatter_skill(tmp, ".NaN"), 2, "frontmatter_parse_error", checker=check_yaml_numeric_rejection, forbidden_output=("Traceback", ".NaN"), expected_severity="error"),
+        TestCase("positive YAML infinity spelling fails closed", lambda tmp: build_numeric_frontmatter_skill(tmp, ".Inf"), 2, "frontmatter_parse_error", checker=check_yaml_numeric_rejection, forbidden_output=("Traceback", ".Inf"), expected_severity="error"),
+        TestCase("negative YAML infinity spelling fails closed", lambda tmp: build_numeric_frontmatter_skill(tmp, "-.INF"), 2, "frontmatter_parse_error", checker=check_yaml_numeric_rejection, forbidden_output=("Traceback", "-.INF"), expected_severity="error"),
+        TestCase("pathological YAML integer fails closed", lambda tmp: build_numeric_frontmatter_skill(tmp, PATHOLOGICAL_YAML_INTEGER), 2, "frontmatter_parse_error", checker=check_yaml_numeric_rejection, forbidden_output=("Traceback", PATHOLOGICAL_YAML_INTEGER), expected_severity="error"),
+        TestCase("finite YAML scientific notation remains valid", lambda tmp: build_numeric_frontmatter_skill(tmp, "6.022e23"), 0, "frontmatter_platform_optional_keys", checker=check_valid_finite_yaml_number),
         TestCase("portable canonical profile accepts a shared package", build_valid_folder_skill, 0, checker=lambda data: check_canonical_target(data, "portable")),
         TestCase("multiple SKILL.md", build_multiple_skill_md, 2, "skill_md_multiple", expected_severity="error"),
         TestCase("duplicate ZIP member", build_duplicate_zip_member, 2, "zip_duplicate_member", expected_severity="error"),

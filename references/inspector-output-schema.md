@@ -277,7 +277,7 @@ For ZIP inputs, the inspector scans every member that passes the configured arch
 |---|---|
 | `frontmatter_missing_or_invalid` | YAML frontmatter is missing or malformed. |
 | `frontmatter_unavailable` | Frontmatter cannot be inspected because the detected root `SKILL.md` is missing. |
-| `frontmatter_parse_error` | Frontmatter is malformed within the restricted YAML subset (for example duplicate keys, tags/anchors/aliases, bad indentation, or unclosed values). |
+| `frontmatter_parse_error` | Frontmatter is malformed within the restricted YAML subset (for example duplicate keys, tags/anchors/aliases, bad indentation, unclosed values, non-finite numeric scalars, or integers beyond the verifier bound). |
 | `frontmatter_yaml_unsupported` | Frontmatter uses valid YAML syntax outside the restricted parser subset or exceeds the bounded nesting verifier. It remains a warning rather than a malformed-YAML error, but marks critical-manifest verification incomplete so strict mode cannot pass. |
 | `frontmatter_unexpected_keys` | Frontmatter contains keys not recognized by this portable Agent Skills inspector. |
 | `frontmatter_name_missing` | `name` is absent or not a string. |
@@ -312,7 +312,10 @@ keys and malformed scalars, with a 64-level nesting bound. When it encounters
 valid YAML outside that subset or bound, it emits an explicit
 `*_yaml_unsupported` warning instead of claiming an Artifact Fail and records
 the manifest as unverified. Use a full YAML-aware validator before treating
-that manifest as verified. A frontmatter closing `---` must begin at column zero, so an indented
+that manifest as verified. Its numeric subset accepts finite decimal and
+scientific-notation floats plus base-10 integers up to 4096 digits. Non-finite
+YAML float spellings and larger integers return a bounded parse finding without
+echoing the target-controlled scalar. A frontmatter closing `---` must begin at column zero, so an indented
 `---` inside a block scalar remains scalar content.
 
 ### Template Marker Findings
