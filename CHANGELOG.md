@@ -6,6 +6,12 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+### Changed
+
+- Rebuilt the README front door with a faster quick start, Agent Skill
+  installation guidance, an example release verdict, and a concise comparison
+  with basic package linting.
+
 ## [v2.0.2] - 2026-07-17
 
 ### Added

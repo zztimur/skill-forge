@@ -1,81 +1,96 @@
 # Skill Forge — Agent Skill Validator & Release Gate
 
 [![Self Tests](https://github.com/zztimur/skill-forge/actions/workflows/self-tests.yml/badge.svg?branch=main)](https://github.com/zztimur/skill-forge/actions/workflows/self-tests.yml)
+[![Latest release](https://img.shields.io/github/v/release/zztimur/skill-forge?sort=semver)](https://github.com/zztimur/skill-forge/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Skill Forge validates, pressure-tests, and release-gates `SKILL.md` packages for OpenAI and portable agent runtimes.
 
-It combines a deterministic package inspector with a qualitative review workflow so you can catch the boring structural failures, the dangerous edge cases, and the subtle instruction problems that only show up once an agent starts interpreting the skill in the wild.
+It combines a dependency-free static inspector with an agent-led audit workflow. Deterministic inspection, official-validator outcomes when available, package self-tests, and qualitative judgment remain separate evidence sources, so an unavailable check cannot quietly turn into a pass.
 
-In plain English: Skill Forge helps you find out whether a skill is actually ready — or just looks ready because the folder has a `SKILL.md` in it.
+## Why Skill Forge
 
-## What this repository contains
+- **Catch package blockers early.** Inspect frontmatter, layout, archive paths, symlinks, missing resources, likely secrets, and risky bundled commands before release.
+- **Test the instructions, not just the files.** Pressure-test triggering, ambiguous requests, wrong inputs, privacy boundaries, fallbacks, and regression behavior.
+- **Make an evidence-backed ship decision.** Reconcile findings, validator results, self-tests, required gates, score caps, and unresolved risks into an honest release verdict.
+
+## 60-second quick start
+
+The standalone inspector requires Python 3.9 or newer and no third-party Python packages.
+
+```bash
+git clone --depth 1 https://github.com/zztimur/skill-forge.git
+cd skill-forge
+python3 -S scripts/inspect_skill_package.py /path/to/skill-or-skill.zip --target portable --strict
+```
+
+A successful inspection ends with output like this:
 
 ```text
-skill-forge/
-├── SKILL.md
-├── README.md
-├── LICENSE
-├── .gitignore
-├── .gitattributes
-├── .github/
-│   └── workflows/
-│       ├── self-tests.yml
-│       └── release-skill.yml
-├── agents/
-│   └── openai.yaml
-├── scripts/
-│   ├── generate_release_notes.py
-│   ├── inspect_skill_package.py
-│   ├── package_skill.py
-│   ├── portable_zip_paths.py
-│   ├── release_metadata.py
-│   ├── release_skill.py
-│   ├── run_self_tests.py
-│   ├── run_source_tests.py
-│   ├── runtime_manifest.py
-│   ├── verify_independent_evaluator.py
-│   └── validate_audit_contract.py
-└── references/
-    ├── audit-contract.json
-    ├── audit-checklist.md
-    ├── artifact-and-mode-matrix.md
-    ├── evaluation-rubric.md
-    ├── example-report.md
-    ├── input-routing.md
-    ├── inspector-output-schema.md
-    ├── platform-compatibility.md
-    ├── pressure-test-suite.md
-    ├── release-gate-checklist.md
-    ├── report-template.md
-    ├── runtime-manifest-schema.md
-    ├── severity-framework.md
-    └── validator-evidence.md
+Status: pass / Findings: 0 errors, 0 warnings.
 ```
+
+In strict mode, exit code `0` means pass, `1` means the input could not be inspected, and `2` means strict validation found an error or could not establish complete required safety or manifest evidence. Use `--target openai` when OpenAI is the intended host, or add `--json` for CI and automation.
+
+## Install as an Agent Skill
+
+On macOS or Linux, download the latest release, verify its SHA-256 checksum, and extract it into the user-level Agent Skills directory:
+
+```bash
+curl -fL https://github.com/zztimur/skill-forge/releases/latest/download/skill-forge.zip -o /tmp/skill-forge.zip
+curl -fL https://github.com/zztimur/skill-forge/releases/latest/download/skill-forge.zip.sha256 -o /tmp/skill-forge.zip.sha256
+python3 -S -c 'import hashlib, pathlib; z = pathlib.Path("/tmp/skill-forge.zip"); expected = pathlib.Path("/tmp/skill-forge.zip.sha256").read_text().split()[0]; actual = hashlib.sha256(z.read_bytes()).hexdigest(); assert actual == expected, "checksum mismatch"'
+mkdir -p "$HOME/.agents/skills"
+python3 -S -m zipfile -e /tmp/skill-forge.zip "$HOME/.agents/skills"
+```
+
+On Windows, download the same two release assets, compare the archive's `Get-FileHash -Algorithm SHA256` result with the checksum file, and extract it under `$HOME\.agents\skills`. The installed entrypoint is:
+
+```text
+$HOME/.agents/skills/skill-forge/SKILL.md
+```
+
+For a repository-scoped install, extract into `$REPO_ROOT/.agents/skills` instead. Codex normally detects newly installed skills automatically; restart it if Skill Forge does not appear. Then try:
+
+```text
+Use $skill-forge to release-gate /path/to/my-skill.zip for OpenAI.
+```
+
+## Example release-gate result
+
+The bundled [example evaluation](references/example-report.md) shows how a structurally valid package can still fail its release gate:
+
+```text
+Release gate verdict: Fail
+Score: 74/100
+Blocking gates:
+- G05: Trigger description is too thin
+- G14: A bundled script is orphaned
+- G20: Wrong-input and privacy pressure tests fail
+```
+
+The score and verdict come from the full audit workflow, not from the standalone inspector alone.
+
+## How it differs from basic package linting
+
+| Question | Basic package linting | Skill Forge |
+|---|---|---|
+| Is the frontmatter and folder shape valid? | Core focus | Deterministic inspection |
+| Do archive paths pass bounded safety checks, and do referenced resources exist? | Varies | Path, symlink, size, reference, and coverage checks |
+| Will the skill trigger and behave well on difficult requests? | Usually out of scope | Qualitative pressure-test workflow |
+| Did an official validator, package self-test, or reviewer produce the evidence? | Often combined or omitted | Reported separately |
+| Is the exact artifact ready to ship? | Not usually answered | Gated verdict with blockers, score caps, and evidence links |
+
+`portable` is a conservative shared baseline, not universal host certification. Secret and dangerous-command scanning is heuristic and non-exhaustive, and audits remain read-only unless repair is explicitly requested.
 
 ## What Skill Forge checks
 
-Skill Forge looks at two different failure modes:
+Skill Forge evaluates two distinct failure classes:
 
-1. **Package integrity** — the things a script can inspect reliably.
-2. **Agent behavior quality** — the things that require judgment, pressure testing, and a working understanding of how skills fail in real use.
+1. **Package integrity** — structure, metadata, archive safety, resources, scripts, and compatibility risks that deterministic inspection can evaluate.
+2. **Agent behavior quality** — triggering, instruction clarity, scope control, fallback behavior, safety posture, and pressure-test results that require judgment.
 
-It can help evaluate:
-
-- Uploaded Skill ZIPs, folders, or `SKILL.md` drafts.
-- Request routing that distinguishes evaluation, validation, repair, release-gate, draft-only, and limited adjacent-review modes.
-- Read-only improvement plans versus explicit repair authority, plus the right source-of-truth boundary for drafts, ZIPs, installed runtimes, source checkouts, repositories, and portfolios.
-- Package structure and expected entrypoints.
-- Cross-platform compatibility risks across OpenAI and portable agent environments.
-- Unsafe archive paths, symlinks, oversized files, suspected secrets, destructive or network-piping commands in bundled scripts, missing resources, and leftover template content.
-- Trigger quality: when the skill should activate, when it should stay out of the way, and where ambiguity may cause bad routing.
-- Instruction clarity, contradiction risk, and unnecessary context bloat.
-- Progressive loading: whether the core skill stays lean while detailed rubrics and references live in linked files.
-- Safety posture and risky workflow assumptions.
-- Pressure-test results and release readiness.
-- Evidence-linked scorecards that reconcile severity findings, score caps, and release decisions.
-- Separate evidence for Skill Forge inspection, trusted official platform validation, and optional package self-tests.
-
-The goal is not to produce a pretty audit for a dashboard. The goal is to stop weak, unsafe, confusing, or overbuilt skills from getting shipped with a confident little smile on their face.
+It accepts Skill ZIPs, folders, or `SKILL.md` drafts and can operate in evaluation, validation, repair, release-gate, draft-only, or limited adjacent-review modes. A complete release review reports Skill Forge inspection, trusted official-validator evidence when available, approved package self-tests, and qualitative evidence separately.
 
 ## Request and artifact boundaries
 
@@ -91,7 +106,7 @@ Forge runtime is not a Git source checkout: locate and confirm the source before
 self-repair or building an archive from a committed revision. Portfolio reviews keep findings,
 scores, and release verdicts separate for every Skill.
 
-## Running the inspector locally
+## Inspector reference
 
 The inspector is dependency-free and uses only the Python standard library. It requires Python 3.9 or newer.
 
@@ -99,7 +114,7 @@ The inspector is dependency-free and uses only the Python standard library. It r
 python3 -S scripts/inspect_skill_package.py /path/to/skill-or-skill.zip --json
 ```
 
-For CI-style checks, use strict mode. Strict mode exits with code `2` when any error-severity finding is present.
+For CI-style checks, use strict mode. It blocks error findings and incomplete required safety or manifest evidence.
 
 ```bash
 python3 -S scripts/inspect_skill_package.py /path/to/skill-or-skill.zip --json --strict
@@ -130,7 +145,7 @@ In strict mode:
 
 - Exit code `0` means the inspected package passed strict checks.
 - Exit code `1` means the input does not exist or could not be inspected in a basic way (for example, a missing path or an unreadable archive).
-- Exit code `2` means one or more error-severity findings were present.
+- Exit code `2` means strict validation found an error-severity finding, could not establish complete safety-scan coverage, or could not fully verify an applicable critical YAML manifest.
 
 The top-level JSON `summary` object is retained for compatibility with existing automation that reads fields such as:
 
@@ -332,6 +347,22 @@ dependent publication job receives `contents: write`; it attaches both the ZIP
 and its SHA-256 checksum to the GitHub Release, refusing to create a release if
 the remote tag is absent. A manual dispatch stops after read-only validation
 and uploads the ZIP plus checksum as a workflow artifact.
+
+## Repository layout
+
+The product overview and quick start stay above; implementation and contributor details live here.
+
+```text
+skill-forge/
+├── SKILL.md                  # Agent workflow and routing instructions
+├── scripts/                  # Inspector, tests, packaging, and release tools
+├── references/               # Audit contract, rubrics, schemas, and templates
+├── agents/openai.yaml        # OpenAI-facing skill metadata
+├── .github/workflows/        # Cross-platform tests and release publication
+├── README.md                 # Usage and technical reference
+├── CHANGELOG.md              # Unreleased and published changes
+└── LICENSE                   # MIT license
+```
 
 ## License
 
