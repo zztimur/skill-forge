@@ -730,6 +730,18 @@ def run_release_tag_verification_case() -> dict[str, Any]:
                 'test "${tag_commit}" = "${head_commit}"',
                 'gh release create "${GITHUB_REF_NAME}"',
                 "--verify-tag",
+                "verify-publication:",
+                "name: Verify published release assets",
+                "name: Restore and prove published annotated tag",
+                "name: Download published release assets by exact tag",
+                'gh release download "${RELEASE_TAG}"',
+                '--pattern "skill-forge.zip"',
+                '--pattern "skill-forge.zip.sha256"',
+                "cmp --silent validated/skill-forge.zip published/skill-forge.zip",
+                "sha256sum --check --strict skill-forge.zip.sha256",
+                "name: Source-prove published archive and canonical profiles",
+                "published/skill-forge.zip",
+                "--source-repo .",
             )
             missing_workflow_fragments = [
                 fragment
@@ -1367,7 +1379,7 @@ def run_cross_platform_contract_path_case() -> dict[str, Any]:
 
 
 def run_workflow_configuration_case() -> dict[str, Any]:
-    """Pin Node 24 actions and avoid duplicate branch-and-tag self-tests."""
+    """Pin Node 24 actions and preserve CI and release event routing."""
 
     try:
         self_tests = SELF_TESTS_WORKFLOW.read_text(encoding="utf-8")
@@ -1384,6 +1396,54 @@ def run_workflow_configuration_case() -> dict[str, Any]:
             failures.append("Self Tests is not restricted to branch pushes")
         if "    tags:\n" not in release or '      - "v*"\n' not in release:
             failures.append("Release Skill lost its release-tag trigger")
+        expected_publication_job = (
+            "  verify-publication:\n"
+            "    name: Verify published release assets\n"
+            "    if: github.event_name == 'push' && "
+            "startsWith(github.ref, 'refs/tags/')\n"
+            "    needs:\n"
+            "      - validate\n"
+            "      - publish\n"
+        )
+        if expected_publication_job not in release:
+            failures.append(
+                "published-asset verification is not gated on tag validation "
+                "and publication"
+            )
+        publication_marker = "  verify-publication:\n"
+        publication_job = (
+            release[release.index(publication_marker) :]
+            if publication_marker in release
+            else ""
+        )
+        required_publication_fragments = (
+            "permissions:\n      contents: read",
+            "ref: ${{ github.sha }}",
+            "fetch-depth: 0",
+            "fetch-tags: true",
+            "name: Restore and prove published annotated tag",
+            'gh release download "${RELEASE_TAG}"',
+            '--repo "${GITHUB_REPOSITORY}"',
+            '--pattern "skill-forge.zip"',
+            '--pattern "skill-forge.zip.sha256"',
+            "cmp --silent validated/skill-forge.zip published/skill-forge.zip",
+            "validated/skill-forge.zip.sha256",
+            "published/skill-forge.zip.sha256",
+            "sha256sum --check --strict skill-forge.zip.sha256",
+            "python -S scripts/package_skill.py verify",
+            "published/skill-forge.zip",
+            "--source-repo .",
+        )
+        missing_publication_fragments = [
+            fragment
+            for fragment in required_publication_fragments
+            if fragment not in publication_job
+        ]
+        if missing_publication_fragments:
+            failures.append(
+                "published-asset verification lost required proof steps: "
+                + ", ".join(missing_publication_fragments)
+            )
 
         expected_self_actions = [
             "uses: actions/checkout@"
@@ -1400,6 +1460,12 @@ def run_workflow_configuration_case() -> dict[str, Any]:
             "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
             "uses: actions/upload-artifact@"
             "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+            "uses: actions/download-artifact@"
+            "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1",
+            "uses: actions/checkout@"
+            "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
+            "uses: actions/setup-python@"
+            "ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0",
             "uses: actions/download-artifact@"
             "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1",
         ]
@@ -1428,7 +1494,7 @@ def run_workflow_configuration_case() -> dict[str, Any]:
         ok = False
         reason = f"workflow configuration check raised {type(exc).__name__}: {exc}"
     return {
-        "name": "CI workflows pin Node 24 actions without duplicate tag self-tests",
+        "name": "CI workflows pin Node 24 actions and preserve release routing",
         "fixture": str(SELF_TESTS_WORKFLOW),
         "expected_exit": 0,
         "actual_exit": 0 if ok else 1,

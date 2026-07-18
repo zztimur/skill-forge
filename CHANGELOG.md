@@ -6,6 +6,12 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+### Added
+
+- Added post-publication verification that downloads release assets by exact
+  tag, compares them with the validated workflow artifact, verifies the
+  published checksum, and source-proves both canonical profiles.
+
 ### Changed
 
 - Updated official GitHub Actions to immutable Node 24-native releases.
