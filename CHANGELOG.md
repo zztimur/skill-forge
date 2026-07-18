@@ -6,6 +6,12 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+### Added
+
+- Added a security policy, contribution guide, and structured issue forms for
+  bugs, false positives, new checks, compatibility requests, and safe security
+  contact requests.
+
 ### Changed
 
 - Rebuilt the README front door with a faster quick start, Agent Skill

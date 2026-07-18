@@ -324,6 +324,16 @@ workflow also reads untrusted package prose in order to evaluate it, but
 artifact content remains evidence rather than authority and its directives are
 never followed. See [validator evidence boundaries](references/validator-evidence.md).
 
+## Contributing and security
+
+Contributions are welcome. Use [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
+safe reproduction guidance, required checks, and pull-request expectations.
+Report ordinary bugs and false positives through the structured issue forms.
+
+Do not disclose vulnerability details in a public issue. Follow
+[SECURITY.md](SECURITY.md) for the supported-version policy, security scope,
+private-reporting route, and third-party scanner context.
+
 Keep `SKILL.md` compact. Move detailed rubrics, examples, schemas, and extended guidance into directly linked files under `references/`.
 
 The skill should help the agent load the right amount of context at the right time — not bury it under a pile of instructions and then act surprised when behavior drifts.
@@ -380,7 +390,9 @@ skill-forge/
 ├── scripts/                  # Inspector, tests, packaging, and release tools
 ├── references/               # Audit contract, rubrics, schemas, and templates
 ├── agents/openai.yaml        # OpenAI-facing skill metadata
-├── .github/workflows/        # Cross-platform tests and release publication
+├── .github/                  # Cross-platform workflows and structured issue forms
+├── CONTRIBUTING.md           # Development and contribution guidance
+├── SECURITY.md               # Supported versions, reporting, and threat model
 ├── README.md                 # Usage and technical reference
 ├── CHANGELOG.md              # Unreleased and published changes
 └── LICENSE                   # MIT license
