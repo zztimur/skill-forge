@@ -11,6 +11,8 @@ top until the local release command promotes them into a versioned entry.
 - Rebuilt the README front door with a faster quick start, Agent Skill
   installation guidance, an example release verdict, and a concise comparison
   with basic package linting.
+- Promoted the tested `npx skills` installation path, added the `skills.sh`
+  badge, and retained checksum-verified release installation instructions.
 
 ## [v2.0.2] - 2026-07-17
 

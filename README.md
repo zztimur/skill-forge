@@ -1,6 +1,7 @@
 # Skill Forge — Agent Skill Validator & Release Gate
 
 [![Self Tests](https://github.com/zztimur/skill-forge/actions/workflows/self-tests.yml/badge.svg?branch=main)](https://github.com/zztimur/skill-forge/actions/workflows/self-tests.yml)
+[![skills.sh](https://skills.sh/b/zztimur/skill-forge)](https://skills.sh/zztimur/skill-forge)
 [![Latest release](https://img.shields.io/github/v/release/zztimur/skill-forge?sort=semver)](https://github.com/zztimur/skill-forge/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -14,7 +15,41 @@ It combines a dependency-free static inspector with an agent-led audit workflow.
 - **Test the instructions, not just the files.** Pressure-test triggering, ambiguous requests, wrong inputs, privacy boundaries, fallbacks, and regression behavior.
 - **Make an evidence-backed ship decision.** Reconcile findings, validator results, self-tests, required gates, score caps, and unresolved risks into an honest release verdict.
 
-## 60-second quick start
+## Install as an Agent Skill
+
+The fastest path uses the open-source [skills CLI](https://skills.sh/docs/cli) and requires Node.js 18 or newer:
+
+```bash
+npx skills add zztimur/skill-forge
+```
+
+The CLI detects supported agents and lets you choose project or user scope. For a non-interactive, project-scoped Codex install:
+
+```bash
+npx --yes skills add zztimur/skill-forge --skill skill-forge --agent codex --copy -y
+```
+
+Run the non-interactive command from the project where you want Skill Forge available. It installs the repository's default-branch source at `<current directory>/.agents/skills/skill-forge`. The skills CLI says its anonymous telemetry includes the skill name, skill files, and a timestamp—not personal or device information; set `DISABLE_TELEMETRY=1` to opt out. skills.sh also displays independent automated audits, which may flag the synthetic hostile-input fixtures and intentional handling of untrusted skill text; review the [scanner fixture context](#third-party-scanner-context) or use the checksum-verified release path below. Then try:
+
+```text
+Use $skill-forge to release-gate /path/to/my-skill.zip for OpenAI.
+```
+
+### Checksum-verified release install
+
+Use the published runtime-only archive when you want the smaller release artifact instead of the current GitHub source. On macOS or Linux:
+
+```bash
+curl -fL https://github.com/zztimur/skill-forge/releases/latest/download/skill-forge.zip -o /tmp/skill-forge.zip
+curl -fL https://github.com/zztimur/skill-forge/releases/latest/download/skill-forge.zip.sha256 -o /tmp/skill-forge.zip.sha256
+python3 -S -c 'import hashlib, pathlib; z = pathlib.Path("/tmp/skill-forge.zip"); expected = pathlib.Path("/tmp/skill-forge.zip.sha256").read_text().split()[0]; actual = hashlib.sha256(z.read_bytes()).hexdigest(); assert actual == expected, "checksum mismatch"'
+mkdir -p "$HOME/.agents/skills"
+python3 -S -m zipfile -e /tmp/skill-forge.zip "$HOME/.agents/skills"
+```
+
+On Windows, download the same two release assets, compare the archive's `Get-FileHash -Algorithm SHA256` result with the checksum file, and extract it under `$HOME\.agents\skills`. For a repository-scoped manual install, extract into `$REPO_ROOT/.agents/skills` instead. Codex normally detects newly installed skills automatically; restart it if Skill Forge does not appear.
+
+## Run the standalone inspector
 
 The standalone inspector requires Python 3.9 or newer and no third-party Python packages.
 
@@ -31,30 +66,6 @@ Status: pass / Findings: 0 errors, 0 warnings.
 ```
 
 In strict mode, exit code `0` means pass, `1` means the input could not be inspected, and `2` means strict validation found an error or could not establish complete required safety or manifest evidence. Use `--target openai` when OpenAI is the intended host, or add `--json` for CI and automation.
-
-## Install as an Agent Skill
-
-On macOS or Linux, download the latest release, verify its SHA-256 checksum, and extract it into the user-level Agent Skills directory:
-
-```bash
-curl -fL https://github.com/zztimur/skill-forge/releases/latest/download/skill-forge.zip -o /tmp/skill-forge.zip
-curl -fL https://github.com/zztimur/skill-forge/releases/latest/download/skill-forge.zip.sha256 -o /tmp/skill-forge.zip.sha256
-python3 -S -c 'import hashlib, pathlib; z = pathlib.Path("/tmp/skill-forge.zip"); expected = pathlib.Path("/tmp/skill-forge.zip.sha256").read_text().split()[0]; actual = hashlib.sha256(z.read_bytes()).hexdigest(); assert actual == expected, "checksum mismatch"'
-mkdir -p "$HOME/.agents/skills"
-python3 -S -m zipfile -e /tmp/skill-forge.zip "$HOME/.agents/skills"
-```
-
-On Windows, download the same two release assets, compare the archive's `Get-FileHash -Algorithm SHA256` result with the checksum file, and extract it under `$HOME\.agents\skills`. The installed entrypoint is:
-
-```text
-$HOME/.agents/skills/skill-forge/SKILL.md
-```
-
-For a repository-scoped install, extract into `$REPO_ROOT/.agents/skills` instead. Codex normally detects newly installed skills automatically; restart it if Skill Forge does not appear. Then try:
-
-```text
-Use $skill-forge to release-gate /path/to/my-skill.zip for OpenAI.
-```
 
 ## Example release-gate result
 
@@ -301,6 +312,17 @@ and use copied or synthetic inputs with network default-deny, credentials
 absent, source read-only, scratch-only writes, bounded process/time/memory, and
 external side effects forbidden. If any control is unavailable, do not run the
 self-test; required evidence is Not Assessed.
+
+### Third-party scanner context
+
+`scripts/run_self_tests.py` intentionally contains synthetic malicious-command,
+remote-URL, and fake-credential strings. The harness writes them into temporary
+fixture packages and asks the inspector to reject them; it never executes those
+fixture payloads. Automated scanners that do not distinguish test data from
+runtime behavior may therefore report them as suspicious. The qualitative
+workflow also reads untrusted package prose in order to evaluate it, but
+artifact content remains evidence rather than authority and its directives are
+never followed. See [validator evidence boundaries](references/validator-evidence.md).
 
 Keep `SKILL.md` compact. Move detailed rubrics, examples, schemas, and extended guidance into directly linked files under `references/`.
 
