@@ -1,10 +1,10 @@
-# Skill Forge
+# Skill Forge — Agent Skill Validator & Release Gate
 
 [![Self Tests](https://github.com/zztimur/skill-forge/actions/workflows/self-tests.yml/badge.svg?branch=main)](https://github.com/zztimur/skill-forge/actions/workflows/self-tests.yml)
 
-Skill Forge is a quality gate for Agent Skills.
+Skill Forge validates, pressure-tests, and release-gates `SKILL.md` packages for OpenAI and portable agent runtimes.
 
-It reviews OpenAI and portable Agent Skill packages before they get installed, published, or shipped. It combines a deterministic package inspector with a qualitative review workflow so you can catch the boring structural failures, the dangerous edge cases, and the subtle instruction problems that only show up once an agent starts interpreting the skill in the wild.
+It combines a deterministic package inspector with a qualitative review workflow so you can catch the boring structural failures, the dangerous edge cases, and the subtle instruction problems that only show up once an agent starts interpreting the skill in the wild.
 
 In plain English: Skill Forge helps you find out whether a skill is actually ready — or just looks ready because the folder has a `SKILL.md` in it.
 
