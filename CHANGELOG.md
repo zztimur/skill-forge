@@ -6,6 +6,8 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+## [v2.0.2] - 2026-07-17
+
 ### Added
 
 - Added post-publication verification that downloads release assets by exact
