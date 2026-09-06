@@ -6,6 +6,8 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+## [v2.1.0] - 2026-09-06
+
 ### Added
 
 - Added rubric 2.0 with fourteen anchored criteria and a versioned scorecard
