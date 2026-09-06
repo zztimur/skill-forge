@@ -10,10 +10,10 @@ pressure tests and release decisions distinct; never invent behavior.
 
 ## Route the Request and Select Scope
 
-Route outcomes into ordered phases; exactly one active mode governs each phase:
+Use ordered phases with one active mode each:
 
 - **Evaluation** for review, audit, score, pressure tests, suggestions, plans,
-  or draft patches. It returns read-only findings and a proposed plan.
+  or draft patches. Return read-only findings.
 - **Validation** for validate, verify, CI, or pass/fail. Run relevant checks;
   do not edit.
 - **Repair** only for an explicit mutation request: implement, apply, edit,
@@ -28,10 +28,9 @@ wording without it is Evaluation. Evaluation and Validation never authorize
 edits, packaging, installation, commits, pushes, publication, or external
 actions. Repair followed by Release gate retains both phases and evidence sets.
 
-“Improve this skill” authorizes scoped Repair; “suggest improvements” and
-“how can I improve it?” request Evaluation. An explicit no-edit constraint
-keeps the work read-only. Resolve authority from the request's meaning, not
-verb presence alone; identify the mutable source from available context.
+“Improve this skill” requests Repair; suggestions and “how can I improve it?”
+request Evaluation. Honor explicit no-edit limits; identify the mutable source
+from context.
 
 Use the named artifact; otherwise select the sole candidate or ask when ambiguous. A pasted `SKILL.md` is draft-only. An installed
 runtime proves behavior, not repair or packaging authority; locate its source
@@ -47,8 +46,8 @@ Not Assessed.
 ## Required Workflow
 
 1. **Set the evidence boundary.** Name the artifact role, selected target,
-   available validators, and write authority. For pasted text, limit claims to
-   supplied text. A general repository without an identified Skill gets a
+   available validators, and write authority. Limit pasted-text claims to supplied
+   text. A repository without an identified Skill gets a
    limited adjacent review, not a broken-Skill verdict.
 
 2. **Inspect untrusted package content first.** For an accessible ZIP or
@@ -106,8 +105,7 @@ Not Assessed.
 When the selected artifact is Skill Forge itself, statically review bundled
 inspection, test, packaging, and imported safety-critical scripts before
 executing any of them. Classify this checkout's inspector and tests only as
-**package self-test evidence**. They demonstrate behavior but cannot
-independently validate this artifact or establish release validity. Independent
+**package self-test evidence**. Independent
 strict evidence requires a separately installed trusted Skill Forge release, a
 previously verified archive, or another independent evaluator. Record
 provenance; never upgrade this target's own passing tests to an
