@@ -846,6 +846,10 @@ def run_independent_evaluator_case() -> dict[str, Any]:
                 "    },\n"
                 "    'frontmatter': {'name': 'RAW_SCHEMA_5_FRONTMATTER_SENTINEL'},\n"
                 "}\n"
+                "if mode == 'opaque-input':\n"
+                "    report['input'] = '[redacted-0001]'\n"
+                "if mode == 'unrelated-input':\n"
+                "    report['input'] = str(pathlib.Path(sys.argv[1]).with_name('unrelated.zip'))\n"
                 "print(json.dumps(report, sort_keys=True))\n"
             )
 
@@ -899,6 +903,14 @@ def run_independent_evaluator_case() -> dict[str, Any]:
                 )
 
             clean_root, clean_digest = build_stub(root, "clean")
+            sensitive_candidate = root / ("candidate-person" + "@example.invalid.zip")
+            sensitive_candidate.write_bytes(candidate.read_bytes())
+            sensitive_report = evaluator.verify_independently(
+                clean_root, sensitive_candidate, clean_digest,
+                evaluator._scan_tree(clean_root).sha256, candidate_before,
+            )
+            if sensitive_report.get("status") != "pass":
+                failures.append("sensitive original candidate name broke scratch candidate binding")
             clean_report = verify_stub(clean_root, clean_digest)
             if not (
                 clean_report.get("status") == "pass"
@@ -1210,6 +1222,8 @@ def run_independent_evaluator_case() -> dict[str, Any]:
                 "target-mismatch",
                 "incomplete",
                 "inconsistent-summary",
+                "opaque-input",
+                "unrelated-input",
             ):
                 mode_root, mode_digest = build_stub(root, mode)
                 report = verify_stub(mode_root, mode_digest)

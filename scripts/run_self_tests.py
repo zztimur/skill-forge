@@ -4169,6 +4169,81 @@ def run_case(case: TestCase, workdir: Path) -> dict[str, Any]:
     }
 
 
+def run_public_output_privacy_case() -> dict[str, Any]:
+    """Exercise every public output channel with synthetic sensitive identities."""
+    failures: list[str] = []
+    try:
+        inspector = load_inspector_module()
+        marker = "audit-person" + "@example.invalid"
+        other = "second-person" + "@example.invalid"
+        token = "gh" + "p_" + "A" * 30
+        paths = ["references/" + marker + "/one.md", "assets/" + other + ".txt"]
+        raw = {
+            "input_exists": True, "coverage_complete": True,
+            "manifest_verification_complete": True,
+            "resource_references": {"unsafe": {
+                paths[0]: "missing", paths[1]: "missing", "[redacted-0001]": "ordinary",
+            }},
+            "tree": paths + ["references/normal.md", "assets/" + token + ".txt"],
+            "structural_findings": [],
+        }
+        original = json.loads(json.dumps(raw))
+        safe = inspector.finalize_result(raw)
+        if any(value in json.dumps(safe) for value in (marker, other, token)):
+            failures.append("public values or dictionary keys leaked synthetic identities")
+        if safe["summary"] != inspector.summarize_findings(original):
+            failures.append("public redaction changed summary counts or enums")
+        if len(safe["resource_references"]["unsafe"]) != 3 or safe["tree"][0] == safe["tree"][1]:
+            failures.append("distinct sensitive paths lost their independent identities")
+        if safe["tree"][0] not in safe["resource_references"]["unsafe"]:
+            failures.append("same path was not substituted consistently within the audit")
+        if safe["tree"][2] != "references/normal.md":
+            failures.append("ordinary path diagnostics changed")
+        if raw != original:
+            failures.append("presentation finalization mutated raw validation data")
+        with tempfile.TemporaryDirectory(prefix="skill_forge_public_output_") as temp:
+            parent = Path(temp)
+            skill = write_valid_skill(parent)
+            sensitive_dir = skill / marker
+            sensitive_dir.mkdir()
+            (sensitive_dir / (other + ".md")).write_text("fixture\n", encoding="utf-8")
+            (skill / (token + ".txt")).write_text("fixture\n", encoding="utf-8")
+            unsafe_zip = parent / (marker + ".zip")
+            with zipfile.ZipFile(unsafe_zip, "w") as archive:
+                archive.writestr("../" + other + ".md", "fixture\n")
+            missing = parent / marker / "missing.zip"
+            package_parent = parent / other
+            package_parent.mkdir()
+            package_check = run_release_package_verification_case(package_parent)
+            if package_check["result"] != "PASS":
+                failures.append("package verifier rejected redacted inspector input paths")
+            for fixture in (skill, unsafe_zip, missing):
+                for output_args in (("--json",), ()):
+                    proc = subprocess.run(
+                        [sys.executable, "-S", str(SCRIPT), str(fixture), *output_args],
+                        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        check=False, timeout=30,
+                    )
+                    if any(value in proc.stdout + proc.stderr for value in (marker, other, token)):
+                        failures.append("CLI JSON, Markdown, or early diagnostic leaked a synthetic identity")
+            proc = subprocess.run(
+                [sys.executable, "-S", str(SCRIPT), str(skill), "--target", marker],
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                check=False, timeout=30,
+            )
+            if proc.returncode != 2 or marker in proc.stdout + proc.stderr:
+                failures.append("argument parsing diagnostics leaked a synthetic identity")
+        reason = "; ".join(failures)
+    except Exception as exc:
+        failures.append("public output regression raised " + type(exc).__name__)
+        reason = "; ".join(failures)
+    return {
+        "name": "public output privacy boundary", "fixture": "synthetic",
+        "expected_exit": 0, "actual_exit": 1 if failures else 0,
+        "expected_code": "", "result": "FAIL" if failures else "PASS", "reason": reason,
+    }
+
+
 def main() -> int:
     cases = [
         TestCase("clean runtime package has complete coverage", build_valid_skill_zip, 0, checker=check_valid_summary),
@@ -4369,6 +4444,7 @@ def main() -> int:
         print(f"Running Skill Forge OpenAI metadata for {target}...", file=sys.stderr, flush=True)
         results.append(run_skill_forge_openai_metadata_case(target))
 
+    results.append(run_public_output_privacy_case())
     print("Running audit and release-report contract validation...", file=sys.stderr, flush=True)
     results.append(run_audit_contract_validation_case())
 

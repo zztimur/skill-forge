@@ -716,7 +716,7 @@ def _profile_result(
         errors.append(f"scratch inspector exited with status {process.returncode}")
     if input_path != str(expected_input):
         errors.append(
-            f"inspected input mismatch: expected {str(expected_input)!r}, received {input_path!r}"
+            "inspected input mismatch; display identifiers do not establish candidate identity"
         )
     if data.get("input_exists") is not True:
         errors.append("input_exists must be true")

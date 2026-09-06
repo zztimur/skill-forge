@@ -9,7 +9,7 @@ The inspector is deterministic evidence collection, not the full audit. Always c
 | Field | Meaning |
 |---|---|
 | `schema_version` | Integer JSON-contract version. Version `6` replaces raw parsed frontmatter with a redacted structural summary. Version `5` added cross-platform path-policy evidence for ZIP and direct-folder inputs. Consumers requiring redacted frontmatter output must require version 6 or later. |
-| `input` | Original path passed to the inspector. |
+| `input` | Original path passed to the inspector, or an audit-local opaque display ID when sensitive. Never use an opaque ID as proof of candidate identity. |
 | `input_exists` | Whether the path exists. |
 | `input_type` | One of `zip`, `directory`, or `other`. |
 | `target` | Backward-compatible requested target spelling. For supported profiles it matches `requested_target` and `canonical_target`. |
@@ -62,6 +62,31 @@ length checks pass and no high-confidence secret or PII shape is detected.
 keys only. Unknown keys and all parser-controlled internal markers are reduced
 to counts or separate findings. The top-level `description_length` field is
 retained for compatibility and matches `frontmatter.description_length`.
+
+## Public Output Privacy Boundary
+
+After deriving findings and the machine summary from raw validation data, the
+inspector creates a presentation copy. All string values and dictionary keys
+are checked for the same high-confidence secret and PII patterns used by the
+frontmatter public-value policy. A matching string is replaced in full with an
+audit-local opaque ID such as `[redacted-0001]`. This includes input paths,
+directory and ZIP member names, resource-reference keys, and error messages.
+JSON, Markdown, early inspection results, and argument-error diagnostics use
+this boundary. Detection remains heuristic; an unchanged string is not proof
+that it contains no sensitive information.
+
+Repeated identical strings receive the same ID within one audit; different
+strings receive distinct IDs, with literal-ID collisions avoided. IDs are not
+cross-audit identifiers, content hashes, filesystem paths, or evidence bindings.
+No raw-to-public mapping is emitted. Normal strings, machine field names,
+finding codes, counts, booleans, and enums retain their existing schema-6
+meaning. The raw validation object remains unchanged.
+
+The package verifier consumes the unchanged summary and strict-exit contract.
+The independent evaluator still requires exact equality with its neutral
+scratch candidate path; redacted or unrelated reported input paths fail that
+binding check. Sensitive original candidate names can be evaluated through the
+existing pinned scratch copy, without treating matching display IDs as identity.
 
 ## Summary Field
 

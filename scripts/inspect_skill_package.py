@@ -1234,6 +1234,78 @@ def contains_sensitive_public_value(value: str) -> bool:
     )
 
 
+@dataclass
+class RedactionContext:
+    """Private, audit-local substitutions; never serialize this context."""
+
+    substitutions: Dict[str, str] = field(default_factory=dict, repr=False)
+    reserved: Set[str] = field(default_factory=set, repr=False)
+    next_id: int = 1
+
+    def public_string(self, value: str) -> str:
+        if not contains_sensitive_public_value(value):
+            return value
+        if value not in self.substitutions:
+            while True:
+                opaque = f"[redacted-{self.next_id:04d}]"
+                self.next_id += 1
+                if opaque not in self.reserved:
+                    break
+            self.reserved.add(opaque)
+            self.substitutions[value] = opaque
+        return self.substitutions[value]
+
+
+def sanitize_public_output(data: dict, context: RedactionContext) -> dict:
+    """Copy presentation data, redacting sensitive strings in values AND keys.
+
+    Reserve existing strings before assigning IDs so an untrusted literal
+    resembling an ID cannot overwrite a redacted dictionary key. Preserve
+    aliases so the finding deduplication contract survives the copy.
+    """
+    pending: List[Any] = [data]
+    visited: Set[int] = set()
+    while pending:
+        item = pending.pop()
+        if isinstance(item, str):
+            context.reserved.add(item)
+        elif isinstance(item, (dict, list, tuple)) and id(item) not in visited:
+            visited.add(id(item))
+            if isinstance(item, dict):
+                pending.extend(item.keys())
+                pending.extend(item.values())
+            else:
+                pending.extend(item)
+    copies: Dict[int, Any] = {}
+
+    def copy_public(item: Any) -> Any:
+        if isinstance(item, str):
+            return context.public_string(item)
+        if isinstance(item, (dict, list, tuple)):
+            if id(item) in copies:
+                return copies[id(item)]
+            if isinstance(item, dict):
+                copied: Any = {}
+                copies[id(item)] = copied
+                for key, value in item.items():
+                    copied[copy_public(key)] = copy_public(value)
+            else:
+                copied = []
+                copies[id(item)] = copied
+                copied.extend(copy_public(value) for value in item)
+            return copied
+        return item
+
+    return copy_public(data)
+
+
+class PublicArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        # argparse includes rejected user values in its early stderr errors.
+        safe = sanitize_public_output({"message": message}, RedactionContext())
+        super().error(safe["message"])
+
+
 def public_frontmatter_summary(frontmatter: Dict[str, Any], target: str) -> Dict[str, Any]:
     """Summarize parsed frontmatter without re-emitting untrusted values.
 
@@ -2877,11 +2949,12 @@ def summarize_findings(data: Dict[str, Any]) -> Dict[str, Any]:
 def finalize_result(data: Dict[str, Any]) -> Dict[str, Any]:
     # Keep this top-level field for CI and release-gate integrations that read
     # summary.status or summary.strict_pass from JSON output.
-    data["summary"] = summarize_findings(data)
-    return data
+    presentation = dict(data, summary=summarize_findings(data))
+    return sanitize_public_output(presentation, RedactionContext())
 
 
 def render_markdown(data: Dict[str, Any]) -> str:
+    data = sanitize_public_output(data, RedactionContext())
     lines: List[str] = []
     lines.append("# Skill Package Inspection")
     lines.append("")
@@ -2969,7 +3042,7 @@ def render_markdown(data: Dict[str, Any]) -> str:
 
 
 def main(argv: Optional[Iterable[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="Inspect an Agent Skill folder or zip archive.")
+    parser = PublicArgumentParser(description="Inspect an Agent Skill folder or zip archive.")
     parser.add_argument("path", help="path to an Agent Skill folder or skill .zip")
     parser.add_argument("--json", action="store_true", help="emit JSON instead of markdown")
     parser.add_argument("--strict", action="store_true", help="exit with code 2 when validation findings contain errors")
