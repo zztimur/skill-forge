@@ -95,7 +95,11 @@ Derive the release verdict from applicable gate rows with this precedence:
 row is Not Applicable, the release verdict is Not Assessed. Use the same rule
 for per-profile and overall cross-profile roll-ups without hiding member results.
 
-Apply the score caps from [`evaluation-rubric.md`](evaluation-rubric.md): unresolved Critical caps at **49/100**; unresolved High caps at **79/100**; missing or failed required pressure evidence caps at **79/100**. A numeric score never overrides a failed applicable gate.
+Only for an explicitly requested legacy projection, apply the caps from
+[`evaluation-rubric.md`](evaluation-rubric.md): unresolved Critical caps that
+projection at **49/100**; unresolved High or missing or failed required pressure
+evidence caps it at **79/100**. These caps never alter quality or coverage.
+A numeric score never overrides a failed applicable gate.
 
 G20 measures both coverage and behavioral success. A completed **Partial** test
 counts as coverage but not behavioral success, so G20 is Partial and release is
