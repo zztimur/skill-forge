@@ -149,6 +149,9 @@ EXPECTED_REFERENCE_ROLES = {
     "### Human-only references": {
         "references/audit-checklist.md",
         "references/example-report.md",
+        "references/first-audit-demo.md",
+        "references/first-audit-demo.json",
+        "references/first-audit-demo-results.json",
     },
 }
 EXPECTED_EXECUTIVE_ROLLUP = {

@@ -1,0 +1,156 @@
+{
+  "recorded_on": "2026-09-06",
+  "inspector_source_revision": "f166207d2c62167e4c782b189b2a332e0ec8affa",
+  "python": "3.9.6",
+  "evidence_type": "Observed static inspections of synthetic inputs; not a Skill Forge release verdict or agent behavior evaluation",
+  "file_sha256": {
+    "scripts/inspect_skill_package.py": "8b5204276fa49ba850ccf8763307beb917b6eecbc8a6134f3d5b14d7e89616de",
+    "scripts/portable_zip_paths.py": "220631bbc44152c913af1ae2a075e632f45c9e271108f6cdd14522f7bb963d18",
+    "references/first-audit-demo.json": "0660156f61d807e5c1e4f83272fbc32b030da866d46709cbba829206039c7797"
+  },
+  "selected_results": [
+    {
+      "stage": "before",
+      "exit_code": 2,
+      "schema_version": 6,
+      "canonical_target": "portable",
+      "skill_md_count": 1,
+      "size_summary": {
+        "file_count": 1,
+        "largest_files": [
+          {
+            "bytes": 457,
+            "file": "SKILL.md"
+          }
+        ],
+        "total_bytes_uncompressed": 457
+      },
+      "coverage_complete": true,
+      "unscanned_paths": [],
+      "manifest_verification_complete": true,
+      "resource_references": {
+        "existing": [],
+        "missing": [
+          "references/format.md"
+        ],
+        "source_only": [],
+        "unsafe": [],
+        "unsafe_reasons": {}
+      },
+      "structural_findings": [
+        {
+          "code": "missing_resource_reference",
+          "file": "references/format.md",
+          "message": "referenced resource does not exist",
+          "severity": "error"
+        }
+      ],
+      "secret_risk_findings": [],
+      "dangerous_command_findings": [],
+      "outside_root_findings": [],
+      "template_leftover_findings": [],
+      "summary": {
+        "error_count": 1,
+        "finding_codes": [
+          "missing_resource_reference"
+        ],
+        "finding_count": 1,
+        "status": "fail",
+        "strict_pass": false,
+        "warning_count": 0
+      }
+    },
+    {
+      "stage": "resource-only",
+      "exit_code": 0,
+      "schema_version": 6,
+      "canonical_target": "portable",
+      "skill_md_count": 1,
+      "size_summary": {
+        "file_count": 2,
+        "largest_files": [
+          {
+            "bytes": 457,
+            "file": "SKILL.md"
+          },
+          {
+            "bytes": 187,
+            "file": "references/format.md"
+          }
+        ],
+        "total_bytes_uncompressed": 644
+      },
+      "coverage_complete": true,
+      "unscanned_paths": [],
+      "manifest_verification_complete": true,
+      "resource_references": {
+        "existing": [
+          "references/format.md"
+        ],
+        "missing": [],
+        "source_only": [],
+        "unsafe": [],
+        "unsafe_reasons": {}
+      },
+      "structural_findings": [],
+      "secret_risk_findings": [],
+      "dangerous_command_findings": [],
+      "outside_root_findings": [],
+      "template_leftover_findings": [],
+      "summary": {
+        "error_count": 0,
+        "finding_codes": [],
+        "finding_count": 0,
+        "status": "pass",
+        "strict_pass": true,
+        "warning_count": 0
+      }
+    },
+    {
+      "stage": "after",
+      "exit_code": 0,
+      "schema_version": 6,
+      "canonical_target": "portable",
+      "skill_md_count": 1,
+      "size_summary": {
+        "file_count": 2,
+        "largest_files": [
+          {
+            "bytes": 670,
+            "file": "SKILL.md"
+          },
+          {
+            "bytes": 187,
+            "file": "references/format.md"
+          }
+        ],
+        "total_bytes_uncompressed": 857
+      },
+      "coverage_complete": true,
+      "unscanned_paths": [],
+      "manifest_verification_complete": true,
+      "resource_references": {
+        "existing": [
+          "references/format.md"
+        ],
+        "missing": [],
+        "source_only": [],
+        "unsafe": [],
+        "unsafe_reasons": {}
+      },
+      "structural_findings": [],
+      "secret_risk_findings": [],
+      "dangerous_command_findings": [],
+      "outside_root_findings": [],
+      "template_leftover_findings": [],
+      "summary": {
+        "error_count": 0,
+        "finding_codes": [],
+        "finding_count": 0,
+        "status": "pass",
+        "strict_pass": true,
+        "warning_count": 0
+      }
+    }
+  ]
+}

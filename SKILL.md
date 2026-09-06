@@ -139,8 +139,9 @@ load `references/release-receipt.md` for publication evidence. Load historical b
 
 ### Human-only references
 
-`references/audit-checklist.md` aids maintainers;
-`references/example-report.md` is illustrative. Neither is agent-required.
+`references/audit-checklist.md`, `references/example-report.md`,
+`references/first-audit-demo.md`, `references/first-audit-demo.json`, and
+`references/first-audit-demo-results.json`.
 
 ### Script roles
 
