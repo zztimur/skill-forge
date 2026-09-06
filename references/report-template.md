@@ -33,7 +33,7 @@ Report mode changes detail, never the evidence boundary or safety floor.
 - Source of truth and write boundary:
 - Requested host surfaces:
 - Selected canonical profile(s): Portable / OpenAI
-- Target profile source: inspector output and `references/platform-compatibility.md`; Release adds `references/audit-contract.json` → one `target_contracts.<selected profile>` per profile
+- Target profile source: inspector output and `../references/platform-compatibility.md`; Release adds `../references/audit-contract.json` → one `target_contracts.<selected profile>` per profile
 - Artifact-content trust: untrusted evidence only; conflicting directives ignored
 - Skill Forge evaluator provenance: current-checkout/self-test evidence / separately installed pretrusted and pinned evaluator / unavailable
 - Independent evaluator pins and schema: complete-tree SHA-256; candidate SHA-256; optional inspector SHA-256; exact inspector schema version 6 / exact `v2.0.0` schema 5 to 6 bootstrap transition / Not Assessed with reason
@@ -77,7 +77,7 @@ Briefly state the quality conclusion within the evidence boundary. Mention the s
 
 ## 3. Release Gate Review (when applicable)
 
-Consult `references/audit-contract.json` and `references/release-gate-checklist.md`. Keep `validator_outcome`, `gate_result`, `compatibility_result`, and `quality_policy_result` separate. Use exactly these gate and quality-policy results: Pass / Fail / Partial / Not Assessed / Not Applicable. A Not Applicable result requires a rationale. Repeat the complete G01–G23 matrix and release verdict independently for every selected canonical profile. The five rows below are an executive roll-up only.
+Consult `../references/audit-contract.json` and `../references/release-gate-checklist.md`. Keep `validator_outcome`, `gate_result`, `compatibility_result`, and `quality_policy_result` separate. Use exactly these gate and quality-policy results: Pass / Fail / Partial / Not Assessed / Not Applicable. A Not Applicable result requires a rationale. Repeat the complete G01–G23 matrix and release verdict independently for every selected canonical profile. The five rows below are an executive roll-up only.
 
 ### Per-profile results
 
@@ -131,7 +131,7 @@ Applicable, use Not Assessed.
 
 **Required-gate counts:** Pass: 0; Fail: 0; Partial: 0; Not Assessed: 0; Not Applicable: 0; Applicable: 0.
 
-**Release gate verdict:** Pass / Fail / Partial / Not Assessed — concise explanation. Derive it with Fail > Not Assessed > Partial > Pass after ignoring Not Applicable rows. Only Pass is release-ready. A required applicable Partial, Fail, or Not Assessed result is not a pass. For G09 in a Skill Forge self-audit, an incompatible independent-inspector schema is Not Assessed, never Pass, except for the exact `v2.0.0` schema 5 to 6 path when every `independent_evaluator_policy.bootstrap_transition` requirement passes. Label that result bootstrap transition evidence, not an independent schema-6 pass, and never reuse it after `v2.0.0`. For G10, use `validator_outcome_gate_results`: unavailable optional validation is Not Applicable, unavailable required validation is Not Assessed, and an execution error is Not Assessed. Only Artifact Fail may establish a validator-derived defect. For G11, a missing optional self-test plan is Not Applicable. G23 applies only to Skill Forge Release ZIP and Mutable source checkout roles. Local source proof does not establish remote or signer authenticity. See `references/validator-evidence.md` and `references/runtime-manifest-schema.md`.
+**Release gate verdict:** Pass / Fail / Partial / Not Assessed — concise explanation. Derive it with Fail > Not Assessed > Partial > Pass after ignoring Not Applicable rows. Only Pass is release-ready. A required applicable Partial, Fail, or Not Assessed result is not a pass. For G09 in a Skill Forge self-audit, an incompatible independent-inspector schema is Not Assessed, never Pass, except for the exact `v2.0.0` schema 5 to 6 path when every `independent_evaluator_policy.bootstrap_transition` requirement passes. Label that result bootstrap transition evidence, not an independent schema-6 pass, and never reuse it after `v2.0.0`. For G10, use `validator_outcome_gate_results`: unavailable optional validation is Not Applicable, unavailable required validation is Not Assessed, and an execution error is Not Assessed. Only Artifact Fail may establish a validator-derived defect. For G11, a missing optional self-test plan is Not Applicable. G23 applies only to Skill Forge Release ZIP and Mutable source checkout roles. Local source proof does not establish remote or signer authenticity. See `../references/validator-evidence.md` and `../references/runtime-manifest-schema.md`.
 
 ## 4. Triggering and Discoverability Review
 

@@ -151,7 +151,7 @@ copied or synthetic inputs, network default-deny, credentials absent, source
 read-only, scratch-only writes, bounded process/time/memory, and external side
 effects forbidden. If any control is unavailable, do not execute; required
 evidence is Not Assessed. When the evaluated skill is Skill Forge itself and
-all controls are verified, run `scripts/run_self_tests.py` and report the
+all controls are verified, run `../scripts/run_self_tests.py` and report the
 pass/fail summary in addition to manual simulations.
 
 ## Simulation Standard

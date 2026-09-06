@@ -121,7 +121,7 @@ passing test suite as an independent release pass.
 
 ### Pinned independent-evaluator helper
 
-The source checkout includes `scripts/verify_independent_evaluator.py` for a
+The source checkout includes `python3 scripts/verify_independent_evaluator.py` for a
 bounded run against a separately installed Skill Forge tree. The evaluator must
 already be trusted from evidence outside the candidate and the current run. A
 required whole-tree SHA-256 pins every accepted evaluator path, byte, and mode;

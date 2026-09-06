@@ -38,7 +38,8 @@ The inspector is deterministic evidence collection, not the full audit. Always c
 | `name_valid_hyphen_case` | Boolean check for lowercase hyphen-case Skill name. |
 | `description_length` | Character count of the frontmatter description. |
 | `top_level_resources` | Top-level resource folders/files such as `scripts`, `references`, `assets`, and platform metadata folders such as `agents`. |
-| `resource_references` | Referenced `scripts/`, `references/`, and `assets/` paths split into `existing`, `missing`, and `unsafe`; `source_only` records the reserved Skill Forge source-only script annotation. |
+| `resource_references` | Compatibility projection of reachable local dependencies: normalized package-relative `existing` and `missing` paths, original `unsafe` references and `unsafe_reasons`; `source_only` retains the reserved Skill Forge source-only script annotation. |
+| `resource_graph` | Reachable local document graph: `documents`, `edges` with source document and 1-based line, original `reference`, normalized `target`, and `status` (`existing`, `missing`, `unsafe`); unsafe edges include `reason`. `unassessed` records omitted document/edge locations and reasons; `complete` is false whenever this list is nonempty. `text_bytes` counts inspected document bytes. |
 | `orphaned_resource_candidates` | Resource files not referenced from `SKILL.md` or declared source-only. These are candidates for manual review, not automatic failures. |
 | `template_marker_findings` | Files containing placeholder-like markers such as TODO or example-template text, with file and regex-pattern evidence. |
 | `template_leftover_findings` | Warning findings derived from placeholder/template markers, using normal severity/code finding fields. |
@@ -196,6 +197,10 @@ upload limit.
 | `max_input_zip_bytes` | Active pre-open ZIP safety boundary. |
 | `max_read_bytes` | Active display/template-read cap. |
 | `max_safety_scan_bytes` | Optional exploratory safety-scan cap. |
+| `max_resource_documents` | Reachable document cap, additionally bounded by package file limits. |
+| `max_resource_edges` | Reachable dependency edge cap. |
+| `max_resource_depth` | Reachable document depth cap, additionally bounded by directory depth. |
+| `max_resource_text_bytes` | Total graph document text cap, additionally bounded by package bytes. |
 | `safety_scans_read_full_eligible_files` | Whether safety scans read every eligible bounded file fully. |
 | `skill_upload_limit_bytes` | Retained compatibility name for the inspector ZIP safety boundary. |
 | `inspector_input_zip_limit_bytes` | Explicit inspector ZIP safety boundary. |
@@ -291,7 +296,8 @@ For ZIP inputs, the inspector scans every member that passes the configured arch
 | `skill_md_missing` | No `SKILL.md` found under detected root. |
 | `skill_md_multiple` | Multiple `SKILL.md` files found under detected root. |
 | `root_skill_md_missing` | Detected root does not contain `SKILL.md`. |
-| `missing_resource_reference` | `SKILL.md` references a missing `scripts/`, `references/`, or `assets/` file. |
+| `missing_resource_reference` | A reachable local instruction/reference document references a missing file. |
+| `resource_graph_incomplete` | Bounded local dependency traversal could not inspect every reachable document/edge; strict inspection fails independently of safety-scan coverage. |
 | `archive_directory_outside_skill_root` | Archive contains an extra directory outside the detected Skill root. |
 | `archive_file_outside_skill_root` | Archive contains an extra file outside the detected Skill root. |
 | `archive_executable_code_outside_skill_root` | Archive contains executable code outside the detected Skill root. Error; strict inspection fails. |
@@ -418,7 +424,7 @@ their meaning.
 
 `openai_metadata_default_prompt_invalid` `openai_metadata_default_prompt_missing_skill_reference` `openai_metadata_display_name_invalid` `openai_metadata_icon_missing` `openai_metadata_icon_path_invalid` `openai_metadata_interface_invalid` `openai_metadata_missing` `openai_metadata_missing_display_name` `openai_metadata_missing_interface` `openai_metadata_missing_short_description` `openai_metadata_short_description_invalid` `openai_metadata_short_description_length` `openai_metadata_unreadable` `openai_metadata_yaml_invalid` `openai_metadata_yaml_unsupported`
 
-`package_folder_large` `package_zip_too_large` `resource_reference_outside_root` `resource_reference_unsafe` `root_skill_md_missing` `scan_coverage_incomplete` `script_dangerous_command` `script_dangerous_command_outside_root`
+`package_folder_large` `package_zip_too_large` `resource_graph_incomplete` `resource_reference_outside_root` `resource_reference_unsafe` `root_skill_md_missing` `scan_coverage_incomplete` `script_dangerous_command` `script_dangerous_command_outside_root`
 
 `secret_provider_api_key` `secret_provider_api_key_outside_root` `secret_api_key_assignment` `secret_api_key_assignment_outside_root` `secret_aws_access_key` `secret_aws_access_key_outside_root` `secret_github_fine_grained_token` `secret_github_fine_grained_token_outside_root` `secret_github_token` `secret_github_token_outside_root` `secret_gitlab_token` `secret_gitlab_token_outside_root` `secret_google_api_key` `secret_google_api_key_outside_root` `secret_google_service_account` `secret_google_service_account_outside_root` `secret_jwt_like_token` `secret_jwt_like_token_outside_root` `secret_openai_api_key` `secret_openai_api_key_outside_root` `secret_password_assignment` `secret_password_assignment_outside_root` `secret_private_key_block` `secret_private_key_block_outside_root` `secret_scan_truncated` `secret_scan_truncated_outside_root` `secret_scan_unreadable` `secret_scan_unreadable_outside_root` `secret_slack_token` `secret_slack_token_outside_root` `secret_stripe_live_key` `secret_stripe_live_key_outside_root` `secret_suspicious_filename` `secret_suspicious_filename_outside_root`
 
@@ -496,6 +502,10 @@ their meaning.
     "max_input_zip_bytes": 30000000,
     "max_read_bytes": 1000000,
     "max_safety_scan_bytes": null,
+    "max_resource_documents": 200,
+    "max_resource_edges": 1000,
+    "max_resource_depth": 32,
+    "max_resource_text_bytes": 10485760,
     "safety_scans_read_full_eligible_files": true,
     "skill_upload_limit_bytes": 30000000,
     "inspector_input_zip_limit_bytes": 30000000,
@@ -541,3 +551,21 @@ their meaning.
   ]
 }
 ```
+
+## Local dependency traversal
+
+Markdown inline and reference-style links resolve relative to their containing
+document, including root documents, angle-bracket destinations with spaces,
+percent escapes, and fragments. Standalone inline paths under `scripts/`,
+`references/`, `assets/`, `./`, or `../` follow the same rule. Inline commands,
+fenced examples, HTML code examples, external URLs, and source-code imports do
+not establish document dependencies. External URLs are never fetched.
+
+Normalized paths must stay inside the package, and symlink traversal is unsafe.
+Only reachable `.md`, `.markdown`, `.txt`, and `.rst` documents are traversed,
+starting at `SKILL.md`; cycles terminate. Defaults are 200 documents, 1,000 edges,
+depth 32, and 10 MiB of text, additionally constrained by existing package file,
+byte, and depth limits. These graph limits are recorded in `effective_limits`.
+A document or edge limit, unreadable document, or undecodable document produces
+`resource_graph_incomplete`. Dependency completeness is separate from
+`coverage_complete`, which still describes secret and dangerous-command scans.

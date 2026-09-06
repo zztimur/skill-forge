@@ -4244,8 +4244,109 @@ def run_public_output_privacy_case() -> dict[str, Any]:
     }
 
 
+def build_resource_path_fixture(tmp: Path, prefix: str, exists: bool) -> Path:
+    root = write_valid_skill(tmp, "path-skill")
+    (root / "scripts").mkdir()
+    if exists:
+        (root / "scripts/helper.py").write_text("print('fixture')\n")
+    main = root / "SKILL.md"
+    main.write_text(main.read_text() + "\n[helper](" + prefix + "scripts/helper.py)\n")
+    return root
+
+
+def run_resource_graph_case() -> dict[str, Any]:
+    """Catch normalization bypasses, lost transitive edges, and false completeness."""
+    failures: list[str] = []
+    inspector = load_inspector_module()
+    with tempfile.TemporaryDirectory(prefix="skill_graph_") as temp:
+        root = write_valid_skill(Path(temp), "graph-skill")
+        main = root / "SKILL.md"
+        base = main.read_text()
+        (root / "scripts").mkdir()
+        for link in ("scripts/missing.py", "./scripts/missing.py"):
+            main.write_text(base + "\n[helper](" + link + ")\n")
+            data = inspector.inspect(root)
+            if data["resource_references"]["missing"] != ["scripts/missing.py"]:
+                failures.append("equivalent missing path bypassed: " + link)
+            if inspector.summarize_findings(data)["strict_pass"]:
+                failures.append("missing path incorrectly strict-passed")
+        (root / "scripts/helper.py").write_text("import nonexistent_module\n")
+        for link in ("scripts/helper.py", "./scripts/helper.py"):
+            main.write_text(base + "\n[helper](" + link + ")\n")
+            data = inspector.inspect(root)
+            if data["resource_references"]["existing"] != ["scripts/helper.py"]:
+                failures.append("equivalent existing path omitted: " + link)
+        (root / "references").mkdir()
+        main.write_text(base + "\n[Guide][guide]\n[guide]: <Guide with spaces.md#start>\n"
+                        "[external](https://example.invalid/no-fetch)\n"
+                        "```md\n[example](absent.md)\n```\n")
+        (root / "Guide with spaces.md").write_text("[next](references/workflow.md)\n")
+        (root / "references/workflow.md").write_text(
+            "[safe](../scripts/helper.py)\n[cycle](../Guide%20with%20spaces.md#start)\n"
+            "[missing](missing.md)\n[escape](../../outside.md)\n")
+        (root / "references/unreachable.md").write_text("[not followed](phantom.md)\n")
+        data = inspector.inspect(root)
+        graph = data.get("resource_graph", {})
+        if data["resource_references"]["missing"] != ["references/missing.md"]:
+            failures.append("reachable nested missing edge was lost or unreachable/example edge followed")
+        if "scripts/helper.py" not in data["resource_references"]["existing"]:
+            failures.append("safe nested parent link rejected")
+        if not graph.get("complete") or len(graph.get("documents", [])) != 3:
+            failures.append("reachable graph/cycle evidence missing")
+        if not any(e.get("source") == "references/workflow.md" and e.get("line") == 3
+                   and e.get("status") == "missing" for e in graph.get("edges", [])):
+            failures.append("nested source location missing")
+        if not data["resource_references"]["unsafe"]:
+            failures.append("normalized parent escape accepted")
+        if hasattr(inspector, "collect_resource_graph"):
+            for kwargs in ({"max_resource_documents": 1}, {"max_resource_edges": 1},
+                           {"max_resource_depth": 1}, {"max_resource_text_bytes": 20}):
+                bounded = inspector.collect_resource_graph(root, main, inspector.InspectionLimits(**kwargs))
+                if bounded.complete or not bounded.unassessed:
+                    failures.append("graph limit silently passed: " + str(kwargs))
+            limited = inspector.inspect(root, limits=inspector.InspectionLimits(max_resource_documents=1))
+            if limited.get("coverage_complete") is not True or not has_code(limited, "resource_graph_incomplete") or inspector.summarize_findings(limited)["strict_pass"]:
+                failures.append("dependency incompleteness lost or conflated with safety coverage")
+            (root / "references/link.md").symlink_to(root / "Guide with spaces.md")
+            main.write_text(base + "\n[symlink](references/link.md)\n")
+            graph = inspector.collect_resource_graph(root, main, inspector.InspectionLimits())
+            if not any(e["status"] == "unsafe" for e in graph.edges):
+                failures.append("symlink dependency accepted")
+            main.write_text(base + "\n[drive](C:/outside.md)\n")
+            graph = inspector.collect_resource_graph(root, main, inspector.InspectionLimits())
+            if not any(e["status"] == "unsafe" for e in graph.edges):
+                failures.append("Windows drive reference skipped as an external URL")
+            (root / "references/guide(v2).md").write_text("guide\n")
+            (root / "references/missing(v2").write_text("truncated-name decoy\n")
+            main.write_text(base + "\n[balanced](references/guide(v2).md)\n"
+                           r"[escaped](references/guide\(v2\).md)" + "\n"
+                           "`[inline example](missing-inline.md)`\n"
+                           "``[example with `code`](missing-double.md)``\n"
+                           "<code>[HTML example](missing-html.md)</code>\n"
+                           "<code>\n[HTML multiline](missing-multiline.md)\n</code>\n"
+                           "`references/guide(v2).md`\n"
+                           "[missing](references/missing(v2).md)\n")
+            graph = inspector.collect_resource_graph(root, main, inspector.InspectionLimits())
+            missing_edges = [e["target"] for e in graph.edges if e["status"] == "missing"]
+            if missing_edges != ["references/missing(v2).md"] or sum(e["status"] == "existing" for e in graph.edges) != 3 or len(graph.edges) != 4:
+                failures.append("balanced/escaped destinations or illustrative code classification failed: " + repr(graph.edges)[:1500])
+            runtime = inspector.collect_resource_graph(SCRIPT.parent.parent, SCRIPT.parent.parent / "SKILL.md", inspector.InspectionLimits())
+            broken = [e for e in runtime.edges if e["status"] != "existing"]
+            if not runtime.complete or broken:
+                failures.append("genuine runtime graph broken: " + repr(broken)[:1500])
+        else:
+            failures.append("collect_resource_graph API missing")
+    return {"name": "normalized reachable resource graph", "fixture": "synthetic and runtime",
+            "expected_exit": 0, "actual_exit": 1 if failures else 0, "expected_code": "",
+            "result": "FAIL" if failures else "PASS", "reason": "; ".join(failures)}
+
+
 def main() -> int:
     cases = [
+        TestCase("canonical missing dependency exits 2", lambda tmp: build_resource_path_fixture(tmp, "", False), 2, "missing_resource_reference"),
+        TestCase("dot-relative missing dependency exits 2", lambda tmp: build_resource_path_fixture(tmp, "./", False), 2, "missing_resource_reference"),
+        TestCase("canonical valid dependency exits 0", lambda tmp: build_resource_path_fixture(tmp, "", True), 0),
+        TestCase("dot-relative valid dependency exits 0", lambda tmp: build_resource_path_fixture(tmp, "./", True), 0),
         TestCase("clean runtime package has complete coverage", build_valid_skill_zip, 0, checker=check_valid_summary),
         TestCase("valid Skill without OpenAI metadata", build_valid_skill_without_openai_metadata, 0),
         TestCase("valid Skill with multiline dependencies", build_valid_skill_with_multiline_dependencies, 0, "frontmatter_platform_optional_keys", checker=check_multiline_dependencies),
@@ -4444,6 +4545,7 @@ def main() -> int:
         print(f"Running Skill Forge OpenAI metadata for {target}...", file=sys.stderr, flush=True)
         results.append(run_skill_forge_openai_metadata_case(target))
 
+    results.append(run_resource_graph_case())
     results.append(run_public_output_privacy_case())
     print("Running audit and release-report contract validation...", file=sys.stderr, flush=True)
     results.append(run_audit_contract_validation_case())

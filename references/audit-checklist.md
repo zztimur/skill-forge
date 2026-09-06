@@ -13,7 +13,7 @@ Use this checklist while reviewing a skill.
 - Draft-only or pasted-text reviews are labeled as such and do not claim package or release validation
 - Target platform/profile is stated: Portable or OpenAI; generic/no-host review maps to Portable rather than Unknown
 - Unavailable files, validators, permissions, and runtime checks are recorded as limitations
-- Artifact role and source of truth are identified using `references/artifact-and-mode-matrix.md`
+- Artifact role and source of truth are identified using `../references/artifact-and-mode-matrix.md`
 - Portfolio or multi-Skill review records independent findings, scores, and release verdicts for every member
 
 ## Package and Structure
@@ -43,13 +43,13 @@ Use this checklist while reviewing a skill.
 - For Skill Forge `v2.0.0` only, schema 5 to 6 bootstrap transition evidence requires both exact opt-in arguments, every `independent_evaluator_policy.bootstrap_transition` requirement, reduced output without raw frontmatter, and an explicit statement that it is not an independent schema-6 pass or reusable after that release
 - Target-bundled scripts are never treated as official evidence or executed solely because their name suggests validation
 - Package self-tests run only after purpose and provenance review, with copied or synthetic inputs, network default-deny, credentials absent, source read-only, scratch-only writes, bounded process/time/memory, and external side effects forbidden; if any control is unavailable, do not execute and required evidence is Not Assessed
-- Inspector finding codes are interpreted using `references/inspector-output-schema.md` when needed
+- Inspector finding codes are interpreted using `../references/inspector-output-schema.md` when needed
 - Inspector output was checked for `outside_root_findings`, not just the summary status
 - Inspector output has `coverage_complete: true` and no unexpected `unscanned_paths` before a strict or release claim
 - Custom inspector limits, if used, are recorded from `effective_limits` and justified in the report
 - `--strict` mode was used when the user requested validation, release gating, or CI-style pass/fail behavior
 - Strict mode fails on incomplete coverage as well as structural errors, unsafe archives/directories, and high-confidence suspected secrets
-- After any evaluator or script change, `scripts/run_source_tests.py` passes and `scripts/run_self_tests.py` passes from the extracted archive built from and source-proved against a committed revision
+- After any evaluator or script change, `python3 scripts/run_source_tests.py` passes and `../scripts/run_self_tests.py` passes from the extracted archive built from and source-proved against a committed revision
 - For Skill Forge releases, `scripts/package_skill.py verify --source-repo` passes canonical archive integrity, manifest-digest binding, local Git source proof, and Portable/OpenAI profiles
 
 ## Triggering

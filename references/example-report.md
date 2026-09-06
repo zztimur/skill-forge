@@ -24,7 +24,7 @@ Use this as a tone and depth guide when the user asks for a polished, executive-
 
 - **Package/folder inspected:** `invoice-parser.zip`
 - **Detected `SKILL.md` files:** exactly 1, at the archive root's `invoice-parser/` folder
-- **Main files and directories:** `SKILL.md`, `references/invoice-fields.md`, `scripts/extract_invoice.py`
+- **Main files and directories:** `SKILL.md`, <code>references/invoice-fields.md</code>, <code>scripts/extract_invoice.py</code>
 - **Package size:** 14 KB uncompressed
 - **Archive preflight findings:** none — no unsafe paths, symlinks, duplicate or case-colliding members
 - **Directory preflight findings:** Not Applicable — ZIP input; no direct folder was inspected
@@ -72,8 +72,8 @@ The Skill has a useful purpose and a sensible structure, but it is **not release
 | G10 | Validator outcome mapped to gate result | Not Applicable | **Validator outcome:** Unavailable; optional mapping yields Not Applicable and compatibility remains Unverified, not an artifact defect. |
 | G11 | Approved package self-tests, separately reported | Not Applicable | No approved package self-test plan was supplied. |
 | G12 | Skill Forge self-tests after evaluator/script changes | Not Applicable | The reviewed artifact is not the Skill Forge mutable source checkout. |
-| G13 | Referenced resources present | Pass | **Verified:** `references/invoice-fields.md` resolves. |
-| G14 | No orphaned/generated/template leftovers | Fail | **Verified:** `scripts/extract_invoice.py` is present but not referenced or documented. |
+| G13 | Referenced resources present | Pass | **Verified:** <code>references/invoice-fields.md</code> resolves. |
+| G14 | No orphaned/generated/template leftovers | Fail | **Verified:** <code>scripts/extract_invoice.py</code> is present but not referenced or documented. |
 | G15 | No bundled secrets or credential-like files | Pass | **Verified:** no secret finding; the heuristic secret-scan note is recorded in §1. |
 | G16 | No unsafe archive or direct-folder findings | Pass | **Verified:** archive preflight has no unsafe paths, symlinks, duplicates, or coverage gap. |
 | G17 | Bundled-script safety review | Pass | **Verified:** reviewed script has no destructive or network-piping command finding. |
@@ -108,7 +108,7 @@ The workflow is mostly logical, but another model instance would have to guess w
 
 ## 6. Resource, Script, and Asset Review
 
-`references/invoice-fields.md` is useful and compact. `scripts/extract_invoice.py` is present but not referenced from `SKILL.md`, so it reads as an orphaned resource and its input/output contract is undocumented. Link it from the workflow with expected arguments, outputs, and failure behavior.
+<code>references/invoice-fields.md</code> is useful and compact. <code>scripts/extract_invoice.py</code> is present but not referenced from `SKILL.md`, so it reads as an orphaned resource and its input/output contract is undocumented. Link it from the workflow with expected arguments, outputs, and failure behavior.
 
 ## 7. Pressure Test Results
 
@@ -141,7 +141,7 @@ script category trigger the missing-or-failed-required-pressure-evidence cap.
 
 - **User request:** "Extract the fields from this invoice PDF."
 - **Would the skill trigger?** Marginally — "invoice" matches, but the thin description makes routing fragile.
-- **Files the assistant would likely read:** `SKILL.md`, `references/invoice-fields.md`.
+- **Files the assistant would likely read:** `SKILL.md`, <code>references/invoice-fields.md</code>.
 - **Actions the assistant would likely take:** run `extract_invoice.py`, map fields, return a summary.
 - **Expected output:** a structured field summary.
 - **Likely quality:** good on clean inputs.
@@ -185,11 +185,11 @@ None.
 
 ### Low
 
-- **Evidence status:** Verified. **Evidence:** package structure and `SKILL.md` references. **File/section:** `SKILL.md` / `scripts/extract_invoice.py`. **Problem:** the script's arguments and output are undocumented and it is not referenced from `SKILL.md`. **Why it matters:** it reads as orphaned and cannot be run confidently. **Recommended fix:** add a short usage block and link it from the workflow. **Re-test:** follow the documented invocation with a representative invoice.
+- **Evidence status:** Verified. **Evidence:** package structure and `SKILL.md` references. **File/section:** `SKILL.md` / <code>scripts/extract_invoice.py</code>. **Problem:** the script's arguments and output are undocumented and it is not referenced from `SKILL.md`. **Why it matters:** it reads as orphaned and cannot be run confidently. **Recommended fix:** add a short usage block and link it from the workflow. **Re-test:** follow the documented invocation with a representative invoice.
 
 ### Nit
 
-- **Evidence status:** Verified. **Evidence:** reference-file headings. **File/section:** `references/invoice-fields.md`. **Problem:** minor heading-case inconsistency. **Recommended fix:** align heading style. **Re-test:** visual Markdown review.
+- **Evidence status:** Verified. **Evidence:** reference-file headings. **File/section:** <code>references/invoice-fields.md</code>. **Problem:** minor heading-case inconsistency. **Recommended fix:** align heading style. **Re-test:** visual Markdown review.
 
 ## 10. Overall Grade
 

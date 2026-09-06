@@ -12,6 +12,7 @@ import stat
 import sys
 import tempfile
 import zipfile
+from urllib.parse import unquote
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
@@ -104,7 +105,6 @@ HIGH_CONFIDENCE_PII_PATTERNS = (
     re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE),
     re.compile(r"(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)"),
 )
-RESOURCE_REF_PATTERN = re.compile(r"`((?:scripts|references|assets)/[^`\s]+)`|\]\(((?:scripts|references|assets)/[^)\s]+)\)")
 # This reserved, self-scoped annotation documents repository-only helpers
 # without turning them into runtime resource requirements. It deliberately
 # uses an HTML comment rather than a normal Markdown resource link, so release
@@ -262,6 +262,7 @@ FINDING_CODE_CATALOG = (
     "openai_metadata_yaml_unsupported",
     "package_folder_large",
     "package_zip_too_large",
+    "resource_graph_incomplete",
     "resource_reference_outside_root",
     "resource_reference_unsafe",
     "root_skill_md_missing",
@@ -451,6 +452,10 @@ class InspectionLimits:
     # package preflight bounds. This opt-in cap exists only for exploratory
     # inspection and necessarily makes safety coverage incomplete.
     max_safety_scan_bytes: Optional[int] = None
+    max_resource_documents: int = 200
+    max_resource_edges: int = 1000
+    max_resource_depth: int = 32
+    max_resource_text_bytes: int = 10 * 1024 * 1024
 
     def as_dict(self) -> Dict[str, Any]:
         return {
@@ -467,6 +472,10 @@ class InspectionLimits:
             "max_input_zip_bytes": self.max_input_zip_bytes,
             "max_read_bytes": self.max_read_bytes,
             "max_safety_scan_bytes": self.max_safety_scan_bytes,
+            "max_resource_documents": self.max_resource_documents,
+            "max_resource_edges": self.max_resource_edges,
+            "max_resource_depth": self.max_resource_depth,
+            "max_resource_text_bytes": self.max_resource_text_bytes,
             "safety_scans_read_full_eligible_files": self.max_safety_scan_bytes is None,
             # Kept as a backward-compatible JSON key for existing consumers. It is an
             # inspector resource boundary, never a claim about a host upload
@@ -2265,64 +2274,266 @@ def strip_code_fences(text: str) -> str:
     return "\n".join(out)
 
 
-def referenced_resources(
+@dataclass
+class ResourceGraph:
+    documents: List[str] = field(default_factory=list)
+    edges: List[Dict[str, Any]] = field(default_factory=list)
+    unassessed: List[Dict[str, Any]] = field(default_factory=list)
+    text_bytes: int = 0
+
+    @property
+    def complete(self) -> bool:
+        return not self.unassessed
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {"documents": self.documents, "edges": self.edges,
+                "unassessed": self.unassessed, "text_bytes": self.text_bytes,
+                "complete": self.complete}
+
+    def projection(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {"existing": [], "missing": [], "unsafe": [],
+                                  "unsafe_reasons": {}, "source_only": []}
+        for edge in self.edges:
+            status = edge["status"]
+            if status not in {"existing", "missing", "unsafe"}:
+                continue
+            path = edge["target"] if status != "unsafe" else edge["reference"]
+            result[status].append(path)
+            if status == "unsafe":
+                result["unsafe_reasons"][path] = edge["reason"]
+        for status in ("existing", "missing", "unsafe"):
+            result[status] = sorted(set(result[status]))
+        return result
+
+
+def markdown_destination(line: str, start: int) -> Optional[Tuple[str, int]]:
+    """Scan one parenthesized destination; work is bounded by the source line."""
+    depth = 1
+    cursor = start + 1
+    content_start = cursor
+    while content_start < len(line) and line[content_start].isspace():
+        content_start += 1
+    quote: Optional[str] = None
+    angle = False
+    while cursor < len(line):
+        char = line[cursor]
+        if char == "\\":
+            cursor += 2
+            continue
+        if quote:
+            if char == quote:
+                quote = None
+        elif char in {"'", '"'} and cursor > start + 1 and line[cursor - 1].isspace():
+            quote = char
+        elif char == "<" and cursor == content_start:
+            angle = True
+        elif char == ">" and angle:
+            angle = False
+        elif not angle and char == "(":
+            depth += 1
+        elif not angle and char == ")":
+            depth -= 1
+            if depth == 0:
+                raw = line[start + 1:cursor].strip()
+                if raw.startswith("<"):
+                    close = raw.find(">")
+                    if close < 0:
+                        return None
+                    value = raw[1:close]
+                else:
+                    value = re.split(r'\s+[\'\"]', raw, maxsplit=1)[0]
+                return re.sub(r"\\([()<>\\])", r"\1", value), cursor + 1
+        cursor += 1
+    return None
+
+
+def inline_code_spans(line: str) -> Iterable[Tuple[int, int, str]]:
+    """Pair equal backtick runs in linear passes, including multi-tick spans."""
+    runs = list(re.finditer(r"`+", line))
+    following: Dict[int, int] = {}
+    last: Dict[int, int] = {}
+    for index in range(len(runs) - 1, -1, -1):
+        length = len(runs[index].group())
+        if length in last:
+            following[index] = last[length]
+        last[length] = index
+    index = 0
+    while index < len(runs):
+        closing = following.get(index)
+        if closing is None:
+            index += 1
+            continue
+        first, final = runs[index], runs[closing]
+        yield first.start(), final.end(), line[first.end():final.start()]
+        index = closing + 1
+
+
+def local_document_links(text: str) -> Iterable[Tuple[str, int]]:
+    """Read Markdown links and standalone inline file paths, never commands.
+
+    Line-preserving fence/comment removal keeps source locations useful. Link
+    destinations are document-relative; schemes and anchors are not resources.
+    This intentionally does not parse source-code imports or HTML code examples.
+    """
+    lines = text.splitlines()
+    fence: Optional[str] = None
+    clean: List[str] = []
+    for line in lines:
+        marker = re.match(r"^\s{0,3}(`{3,}|~{3,})", line)
+        if marker and fence is None:
+            fence = marker.group(1)
+            clean.append("")
+        elif fence is not None:
+            if re.match(r"^\s{0,3}" + re.escape(fence[0]) + "{" + str(len(fence)) + r",}\s*$", line):
+                fence = None
+            clean.append("")
+        else:
+            clean.append(line)
+    body = "\n".join(clean)
+    body = re.sub(r"<!--.*?-->", lambda m: "\n" * m.group().count("\n"), body, flags=re.S)
+    body = re.sub(r"<(code|pre)\b[^>]*>.*?</\1\s*>",
+                  lambda m: re.sub(r"[^\n]", " ", m.group()), body, flags=re.S | re.I)
+    definitions: Dict[str, str] = {}
+    definition = re.compile(r'^\s{0,3}\[([^\]]+)\]:\s*(<[^>]*>|\S+)(?:\s+.*)?$')
+    def label(value: str) -> str:
+        return " ".join(value.lower().split())
+    for line in body.splitlines():
+        match = definition.match(line)
+        if match:
+            definitions.setdefault(label(match.group(1)), match.group(2).strip("<>"))
+    link_pattern = re.compile(r'!?\[([^\]\n]*)\]')
+    for number, line in enumerate(body.splitlines(), 1):
+        if definition.match(line):
+            continue
+        code_spans = list(inline_code_spans(line))
+        masked = list(line)
+        for start, end, _ in code_spans:
+            masked[start:end] = " " * (end - start)
+        markup = "".join(masked)
+        spans: List[Tuple[int, int]] = []
+        consumed = 0
+        for match in link_pattern.finditer(markup):
+            if match.start() < consumed:
+                continue
+            end = match.end()
+            value = ""
+            if end < len(markup) and markup[end] == "(":
+                destination = markdown_destination(markup, end)
+                if destination is None:
+                    # Do not rescan an unmatched remainder for every label.
+                    break
+                value, end = destination
+            elif end < len(markup) and markup[end] == "[":
+                close = markup.find("]", end + 1)
+                if close >= 0:
+                    value = definitions.get(label(markup[end + 1:close] or match.group(1)), "")
+                    end = close + 1
+            else:
+                value = definitions.get(label(match.group(1)), "")
+            if value:
+                consumed = end
+                spans.append((match.start(), end))
+                yield value, number
+        for start, _, value in code_spans:
+            if any(begin <= start < end for begin, end in spans):
+                continue
+            # Standalone inline paths retain resource semantics; commands and
+            # embedded Markdown examples do not establish dependencies.
+            if not re.search(r'\s|[<>*{}|]', value) and not value.endswith("/") and (
+                value.startswith(("scripts/", "references/", "assets/", "./", "../"))
+            ):
+                yield value, number
+
+
+def collect_resource_graph(skill_root: Path, entrypoint: Path, limits: InspectionLimits) -> ResourceGraph:
+    """Collect a bounded, local-only graph from reachable instruction documents."""
+    graph = ResourceGraph()
+    root = skill_root.resolve()
+    document_cap = min(limits.max_resource_documents, limits.max_directory_files, limits.max_zip_members)
+    byte_cap = min(limits.max_resource_text_bytes, limits.max_directory_total_bytes, limits.max_zip_uncompressed_bytes)
+    file_cap = min(limits.max_directory_file_bytes, limits.max_zip_member_bytes)
+    depth_cap = min(limits.max_resource_depth, limits.max_directory_depth)
+    queue: List[Tuple[Path, int]] = [(entrypoint, 0)]
+    queued = {entrypoint.resolve()}
+    cursor = 0
+    while cursor < len(queue):
+        document, depth = queue[cursor]
+        cursor += 1
+        source = relative(document, root)
+        reason = None
+        if depth > depth_cap:
+            reason = "document depth limit"
+        elif len(graph.documents) >= document_cap:
+            reason = "document count limit"
+        try:
+            if document.resolve() != root and root not in document.resolve().parents:
+                reason = "document outside root"
+            elif any(part.is_symlink() for part in (document, *document.parents) if part != root and root in part.parents):
+                reason = "symlink document"
+            elif not is_regular_file(document):
+                reason = "document unavailable or not regular"
+            if reason is None:
+                remaining = min(file_cap, byte_cap - graph.text_bytes)
+                with document.open("rb") as stream:
+                    payload = stream.read(max(0, remaining) + 1)
+                if len(payload) > remaining:
+                    reason = "document text byte limit"
+                else:
+                    text = payload.decode("utf-8")
+        except (OSError, RuntimeError, UnicodeError, ValueError):
+            reason = "document unreadable"
+        if reason:
+            graph.unassessed.append({"source": source, "reason": reason})
+            continue
+        graph.documents.append(source)
+        graph.text_bytes += len(payload)
+        for raw, line in local_document_links(text):
+            drive_path = re.match(r"^[A-Za-z]:", raw) is not None
+            external_scheme = re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", raw) is not None
+            if not raw or raw.startswith(("#", "//")) or (external_scheme and not drive_path):
+                continue
+            if len(graph.edges) >= limits.max_resource_edges:
+                graph.unassessed.append({"source": source, "line": line, "reason": "edge count limit"})
+                break
+            ref = unquote(raw.split("#", 1)[0].split("?", 1)[0])
+            if not ref:
+                continue
+            edge: Dict[str, Any] = {"source": source, "line": line, "reference": raw, "target": ref, "status": "unsafe"}
+            graph.edges.append(edge)
+            path = PurePosixPath(ref)
+            if path.is_absolute() or re.match(r"^[A-Za-z]:", ref) or "\\" in ref or "\x00" in ref:
+                edge["reason"] = "resource references must be local relative paths, not absolute paths"
+                continue
+            candidate = document.parent.joinpath(*path.parts)
+            try:
+                resolved = candidate.resolve()
+                if resolved != root and root not in resolved.parents:
+                    edge["reason"] = "resource reference resolves outside the skill root"
+                elif any(part.is_symlink() for part in (candidate, *candidate.parents) if part != root and root in part.parents):
+                    edge["reason"] = "resource reference points through a symlink"
+                elif candidate.exists() and not is_regular_file(candidate):
+                    edge["reason"] = "resource reference must point to a regular file"
+                else:
+                    edge["target"] = relative(resolved, root)
+                    edge["status"] = "existing" if candidate.exists() else "missing"
+                    if edge["status"] == "existing" and resolved.suffix.lower() in {".md", ".markdown", ".txt", ".rst"} and resolved not in queued:
+                        queue.append((resolved, depth + 1))
+                        queued.add(resolved)
+            except (OSError, RuntimeError, ValueError):
+                edge["reason"] = "resource reference could not be inspected safely"
+    return graph
+
+
+def source_only_resources(
     skill_text: str,
     skill_root: Path,
     *,
     declared_skill_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    refs: List[str] = []
-    for match in RESOURCE_REF_PATTERN.finditer(strip_code_fences(skill_text)):
-        value = match.group(1) or match.group(2)
-        if value:
-            # Defensive: keep only the first whitespace-delimited token so a
-            # documented command like `scripts/tool.py --json` is not mistaken
-            # for a file named "scripts/tool.py --json".
-            tokens = value.strip().split()
-            if tokens:
-                refs.append(tokens[0].split("#", 1)[0])
-    unique_refs = sorted(set(refs))
-    existing: List[str] = []
-    missing: List[str] = []
     unsafe: List[str] = []
     unsafe_reasons: Dict[str, str] = {}
     source_only: List[str] = []
-    try:
-        resolved_root = skill_root.resolve()
-    except OSError:
-        resolved_root = skill_root
-    for ref in unique_refs:
-        posix_path = PurePosixPath(ref)
-        if posix_path.is_absolute() or ".." in posix_path.parts:
-            unsafe.append(ref)
-            unsafe_reasons[ref] = "resource references must not be absolute or use parent-directory traversal"
-            continue
-        candidate = skill_root.joinpath(*posix_path.parts)
-        try:
-            resolved_candidate = candidate.resolve(strict=False)
-        except OSError as exc:
-            unsafe.append(ref)
-            unsafe_reasons[ref] = f"resource reference could not be resolved safely: {exc}"
-            continue
-        if resolved_candidate != resolved_root and resolved_root not in resolved_candidate.parents:
-            unsafe.append(ref)
-            unsafe_reasons[ref] = "resource reference resolves outside the skill root"
-            continue
-        try:
-            if candidate.is_symlink():
-                unsafe.append(ref)
-                unsafe_reasons[ref] = "resource reference points to a symlink"
-            elif candidate.exists() and not is_regular_file(candidate):
-                unsafe.append(ref)
-                unsafe_reasons[ref] = "resource reference must point to a regular file"
-            elif candidate.exists():
-                existing.append(ref)
-            else:
-                missing.append(ref)
-        except OSError as exc:
-            unsafe.append(ref)
-            unsafe_reasons[ref] = f"resource reference could not be inspected safely: {exc}"
-
+    resolved_root = skill_root.resolve()
     # A Skill Forge source checkout has a few repository-maintenance helpers
     # that are deliberately excluded from its installable runtime. Keep their
     # declaration distinct from ordinary Markdown resource references: this
@@ -2371,8 +2582,8 @@ def referenced_resources(
                 source_only.append(ref)
 
     return {
-        "existing": sorted(set(existing)),
-        "missing": sorted(set(missing)),
+        "existing": [],
+        "missing": [],
         "unsafe": sorted(set(unsafe)),
         "unsafe_reasons": unsafe_reasons,
         "source_only": sorted(set(source_only)),
@@ -2861,11 +3072,16 @@ def inspect(input_path: Path, tree_limit: int = MAX_DEFAULT_TREE_FILES, limits: 
                 result["description_length"] = frontmatter_summary["description_length"]
             else:
                 result["frontmatter_validation_findings"] = [finding("error", "frontmatter_missing_or_invalid", fm_error or "frontmatter missing or invalid")]
-            resource_refs = referenced_resources(
-                text,
-                root,
-                declared_skill_name=declared_skill_name,
+            graph = collect_resource_graph(root, main_skill, limits)
+            result["resource_graph"] = graph.as_dict()
+            resource_refs = graph.projection()
+            declarations = source_only_resources(
+                "\n".join(match.group() for match in SOURCE_ONLY_DECLARATION_PATTERN.finditer(strip_code_fences(text))),
+                root, declared_skill_name=declared_skill_name,
             )
+            resource_refs["source_only"] = declarations["source_only"]
+            resource_refs["unsafe"] = sorted(set(resource_refs["unsafe"] + declarations["unsafe"]))
+            resource_refs["unsafe_reasons"].update(declarations["unsafe_reasons"])
             result["resource_references"] = resource_refs
         else:
             result["frontmatter_error"] = "no root SKILL.md found"
@@ -2884,6 +3100,11 @@ def inspect(input_path: Path, tree_limit: int = MAX_DEFAULT_TREE_FILES, limits: 
         result["unverified_manifests"] = sorted(set(result["unverified_manifests"]))
         result["manifest_verification_complete"] = not result["unverified_manifests"]
         result["structural_findings"] = structural_findings(len(skill_files), main_skill.exists(), resource_refs)
+        if result.get("resource_graph", {}).get("complete") is False:
+            result["structural_findings"].append(finding(
+                "error", "resource_graph_incomplete", "reachable local dependency inspection is incomplete",
+                unassessed=result["resource_graph"]["unassessed"],
+            ))
         result["orphaned_resource_candidates"] = find_orphaned_resource_candidates(root_files, root, resource_refs)
         return finalize_result(result)
     finally:
