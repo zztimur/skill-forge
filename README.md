@@ -1,19 +1,19 @@
-# Skill Forge — Agent Skill Validator & Release Gate
+# Skill Forge — Find problems in your Agent Skills before you ship
 
 [![Self Tests](https://github.com/zztimur/skill-forge/actions/workflows/self-tests.yml/badge.svg?branch=main)](https://github.com/zztimur/skill-forge/actions/workflows/self-tests.yml)
 [![skills.sh](https://skills.sh/b/zztimur/skill-forge)](https://skills.sh/zztimur/skill-forge)
 [![Latest release](https://img.shields.io/github/v/release/zztimur/skill-forge?sort=semver)](https://github.com/zztimur/skill-forge/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Skill Forge validates, pressure-tests, and release-gates `SKILL.md` packages for OpenAI and portable agent runtimes.
+Get a prioritized review of your `SKILL.md`, skill folder, or ZIP: what could break, what the evidence shows, and what to fix next.
 
-It combines a dependency-free static inspector with an agent-led audit workflow. Deterministic inspection, official-validator outcomes when available, package self-tests, and qualitative judgment remain separate evidence sources, so an unavailable check cannot quietly turn into a pass.
+Skill Forge combines a dependency-free Python inspector with an agent-led review of triggering, instructions, edge cases, and release readiness. Automated findings and qualitative judgments are reported separately; missing evidence stays visible.
 
 ## Why Skill Forge
 
-- **Catch package blockers early.** Inspect frontmatter, layout, archive paths, symlinks, missing resources, likely secrets, and risky bundled commands before release.
-- **Test the instructions, not just the files.** Pressure-test triggering, ambiguous requests, wrong inputs, privacy boundaries, fallbacks, and regression behavior.
-- **Make an evidence-backed ship decision.** Reconcile findings, validator results, self-tests, required gates, score caps, and unresolved risks into an honest release verdict.
+- **Find broken dependencies.** Catch missing referenced files, invalid metadata, and unsafe package paths.
+- **Review confusing instructions.** Examine when the skill should trigger and how it handles ambiguous requests, missing inputs, and conflicting rules.
+- **Know what to fix next.** Get prioritized findings with evidence and suggested fixes, or request a full release-gate review when you are ready to ship.
 
 ## Install as an Agent Skill
 
@@ -23,17 +23,42 @@ The fastest path uses the open-source [skills CLI](https://skills.sh/docs/cli) a
 npx skills add zztimur/skill-forge
 ```
 
+Then ask your agent to review one skill:
+
+```text
+Use $skill-forge to review /path/to/my-skill. Give me a compact report
+with the three most important problems, supporting evidence, and
+suggested fixes. If fewer problems are supported, report only those.
+```
+
+Replace the path with your skill folder, ZIP, or `SKILL.md` draft. Reviews are read-only; ask explicitly to apply fixes. A draft review covers the supplied text, while package inspection needs the folder or ZIP. Host-specific checks require the corresponding target; the default `portable` profile is a shared baseline.
+
+## See what a first audit catches
+
+A synthetic meeting-notes skill references a missing file and gives conflicting instructions about missing action owners. We ran the static inspector before and after repairs:
+
+| Input | Observed static result | Instruction review |
+|---|---|---|
+| Original | Fail: `missing_resource_reference` | Broad trigger; conflicting owner rules |
+| Missing file added | Pass: 0 errors, 0 warnings | Both instruction problems remain |
+| Instructions also revised | Pass: 0 errors, 0 warnings | Trigger narrowed; missing owners marked `Unspecified` |
+
+The middle row matters: a valid package can still give an agent conflicting instructions. The instruction findings above come from a qualitative review of the text, not observed agent execution. These static passes are not release verdicts or host certifications.
+
+**[See the exact inputs, recorded results, and rerun instructions →](references/first-audit-demo.md)**
+
+## Installation options
+
+<details>
+<summary>Agent scope, telemetry, scanner context, and checksum-verified releases</summary>
+
 The CLI detects supported agents and lets you choose project or user scope. For a non-interactive, project-scoped Codex install:
 
 ```bash
 npx --yes skills add zztimur/skill-forge --skill skill-forge --agent codex --copy -y
 ```
 
-Run the non-interactive command from the project where you want Skill Forge available. It installs the repository's default-branch source at `<current directory>/.agents/skills/skill-forge`. The skills CLI says its anonymous telemetry includes the skill name, skill files, and a timestamp—not personal or device information; set `DISABLE_TELEMETRY=1` to opt out. skills.sh also displays independent automated audits, which may flag the synthetic hostile-input fixtures and intentional handling of untrusted skill text; review the [scanner fixture context](#third-party-scanner-context) or use the checksum-verified release path below. Then try:
-
-```text
-Use $skill-forge to release-gate /path/to/my-skill.zip for OpenAI.
-```
+Run the non-interactive command from the project where you want Skill Forge available. It installs the repository's default-branch source at `<current directory>/.agents/skills/skill-forge`. The skills CLI says its anonymous telemetry includes the skill name, skill files, and a timestamp—not personal or device information; set `DISABLE_TELEMETRY=1` to opt out. skills.sh also displays independent automated audits, which may flag the synthetic hostile-input fixtures and intentional handling of untrusted skill text; review the [scanner fixture context](#third-party-scanner-context) or use the checksum-verified release path below.
 
 ### Checksum-verified release install
 
@@ -72,6 +97,8 @@ Installation stages outside the active skills directory, then replaces the entir
 If the existing installation contains `.env` or `.env.*` paths, the helper refuses the installation before opening those files and leaves the old tree unchanged.
 
 For a project installation, create its `.agents/skills` directory first and pass that real path as `--skills-dir`. On Windows, download both assets from the same exact release tag and invoke the same Python helper with native paths and the reviewed digest. Codex normally detects newly installed skills automatically; restart it if Skill Forge does not appear.
+
+</details>
 
 ## Run the standalone inspector
 

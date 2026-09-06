@@ -6,6 +6,10 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+### Changed
+
+- Lead the README with a compact first-audit prompt and a reproducible synthetic demonstration separating observed static findings from qualitative instruction review. Keep detailed installation options available in an expandable section.
+
 ## [v2.2.1] - 2026-09-06
 
 ### Fixed
