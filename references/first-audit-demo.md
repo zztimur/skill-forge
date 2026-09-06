@@ -33,7 +33,7 @@ example does not add extra `SKILL.md` entrypoints to Skill Forge's package.
 
 | Priority | Evidence | Finding | Fix |
 |---|---|---|---|
-| 1 | Observed static inspection | `references/format.md` is missing; the workflow requires it before answering. | Add the actual format document. |
+| 1 | Observed static inspection | <code>references/format.md</code> is missing in the example skill; the workflow requires it before answering. | Add the actual format document. |
 | 2 | Qualitative instruction review | One rule requires asking for an owner; the next prohibits questions and invents an assignment to the organizer. | Preserve stated owners and mark missing ones `Unspecified`. |
 | 3 | Qualitative instruction review | “All writing requests” and “emails” extend the trigger beyond the meeting-notes workflow. | Limit the description to supplied meeting notes, transcripts, decisions, and action items. |
 
