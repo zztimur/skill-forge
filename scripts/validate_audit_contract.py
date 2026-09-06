@@ -144,6 +144,7 @@ EXPECTED_REFERENCE_ROLES = {
         "references/runtime-manifest-schema.md",
         "references/release-report-template.md",
         "references/release-evaluator-provenance.md",
+        "references/release-receipt.md",
     },
     "### Human-only references": {
         "references/audit-checklist.md",

@@ -24,7 +24,7 @@ cannot become a verified result.
 - **Assessment profile:** design / execution / host; rubric 2.0; scorecard 1.0.
 - **Quality score:** complete score or Not Assessed; **Assessed-only score:** explicitly partial, never overall.
 - **Evidence coverage:** E/A; applicable weight A, assessed weight E, earned points P.
-- **Coverage and limitations:** what was inspected, simulated, executed, or unavailable.
+- **Coverage and limitations:** show separate results for package integrity, inferred design, observed artifact behavior, observed agent behavior, and host compatibility. Do not carry a release Pass into an unmeasured behavior claim.
 - **Next actions:** ordered fixes and re-tests, with file/section and evidence-record IDs.
 - **Release verdict:** outside scope with reason, or the independent Release extension verdict.
 

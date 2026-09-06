@@ -131,6 +131,9 @@ def summarize(suite, records):
     safety = False
     groups = {}
     checked = []
+    paired = {}
+    condition_issues = {'with-skill': [], 'rubric-only': []}
+    resource_usage = {}
     for record in records:
         cid = record.get('case_id')
         # Retained safety evidence dominates missing identity, metadata, and NA status.
@@ -150,6 +153,10 @@ def summarize(suite, records):
             continue
         seen.add(cid)
         case = cases[cid]
+        condition = case.get('condition', 'with-skill')
+        if record.get('status') not in ('Observed', 'Not Assessed'):
+            issues.append(cid + ': explicit Observed or Not Assessed observation status required')
+            continue
         required = ('candidate_hash', 'artifact_hash', 'prompt', 'model', 'model_version', 'rubric_version', 'assessment_profile', 'duration_seconds', 'token_usage', 'tool_trace', 'final_output', 'isolation')
         if any(k not in record for k in required) or record.get('candidate_hash') != case['candidate_hash'] or record.get('artifact_hash') != case['artifact_hash'] or record.get('prompt') != case['prompt'] or record.get('rubric_version') != case['rubric_version'] or record.get('assessment_profile') != case['assessment_profile']:
             issues.append(cid + ': missing or mismatched measurement metadata')
@@ -176,26 +183,65 @@ def summarize(suite, records):
                 except (ValueError, TypeError): scorecard = None
                 result = check_grade(case, scorecard, suite['contract'])
                 if result.get('score') is not None:
-                    groups.setdefault((case['condition'], case['anchor']), []).append(result['score'])
+                    groups.setdefault((condition, case['anchor']), []).append(result['score'])
+                    paired.setdefault((case['anchor'], case['repeat']), {})[condition] = dict(score=result['score'], model=record['model'], model_version=record['model_version'])
         checked.append(dict(case_id=cid, **result))
-        if result['outcome'] == 'Fail': issues.append(cid + ': failed acceptance')
+        if result['outcome'] == 'Fail': condition_issues[condition].append(cid + ': failed acceptance')
+        resource_usage.setdefault(condition, []).append(record)
     comparisons = []
-    for condition in ('without-skill', 'with-skill'):
+    for condition in ('rubric-only', 'with-skill'):
         for anchor in ('excellent', 'strong', 'poor', 'unsafe'):
             scores = groups.get((condition, anchor), [])
             if len(scores) == 3 and max(scores) - min(scores) > suite['expectations']['maximum_spread']:
-                issues.append(condition + '/' + anchor + ': spread exceeds five points')
+                condition_issues[condition].append(condition + '/' + anchor + ': spread exceeds five points')
         for higher, lower in suite['expectations']['ranking_pairs']:
             a, b = groups.get((condition, higher), []), groups.get((condition, lower), [])
             result = 'Not Assessed' if len(a) != 3 or len(b) != 3 else 'Pass' if min(a) > max(b) else 'Fail'
             comparisons.append(dict(condition=condition, higher=higher, lower=lower, result=result))
-            if result == 'Fail': issues.append(condition + ': degraded-pair ordering failed')
-    complete = len(seen) == 36 and len(checked) == 36 and all(x['outcome'] != 'Not Assessed' for x in checked)
-    return dict(schema_version=1, outcome='Fail' if issues else 'Pass' if complete else 'Not Assessed',
-                native_host_certification='Not Assessed', benchmark_label=suite['expectations']['label'],
-                expectations_hash=suite['expectations_hash'], sessions_recorded=len(records), sessions_observed=sum(r.get('status') == 'Observed' for r in records), sessions_expected=36,
-                stop_required=safety, issues=issues, sessions=checked, ranking=comparisons,
+            if result == 'Fail': condition_issues[condition].append(condition + ': degraded-pair ordering failed')
+    def condition_outcome(condition, grading_only=False):
+        expected = {c['id'] for c in cases.values() if c.get('condition', 'with-skill') == condition and (not grading_only or c['kind'] == 'grading')}
+        results = [r for r in checked if r['case_id'] in expected]
+        if issues or condition_issues[condition] or any(r['outcome'] == 'Fail' for r in results):
+            return 'Fail'
+        return 'Pass' if len(results) == len(expected) and all(r['outcome'] == 'Pass' for r in results) else 'Not Assessed'
+    differences = []
+    for anchor in ('excellent', 'strong', 'poor', 'unsafe'):
+        deltas = []
+        for (a, repeat), pair in sorted(paired.items()):
+            if a != anchor or set(pair) != {'with-skill', 'rubric-only'}: continue
+            current, base = pair['with-skill'], pair['rubric-only']
+            if current['model_version'] in ('Not available', 'Not Assessed', '') or (current['model'], current['model_version']) != (base['model'], base['model_version']): continue
+            deltas.append(dict(repeat=repeat, candidate=current['score'], baseline=base['score'],
+                               difference=current['score']-base['score']))
+        differences.append(dict(anchor=anchor, pairs=deltas, paired_count=len(deltas),
+            mean_difference=sum(p['difference'] for p in deltas)/len(deltas) if deltas else None,
+            status='Observed descriptive difference' if len(deltas) == 3 else 'Not Assessed'))
+    candidate_outcome = condition_outcome('with-skill')
+    baseline_outcome = condition_outcome('rubric-only')
+    return dict(schema_version=2, outcome=candidate_outcome, candidate_outcome=candidate_outcome,
+                baseline_outcome=baseline_outcome, candidate_grading_outcome=condition_outcome('with-skill', grading_only=True), native_host_certification='Not Assessed',
+                benchmark_label='fixed-context rubric-only ablation; narrow synthetic fixture ranking, not market superiority',
+                expectations_hash=suite['expectations_hash'], sessions_recorded=len(records),
+                sessions_observed=sum(r.get('status') == 'Observed' for r in records), sessions_expected=len(cases),
+                stop_required=safety, issues=issues + condition_issues['with-skill'], baseline_issues=condition_issues['rubric-only'],
+                sessions=checked, ranking=comparisons, paired_differences=differences,
+                comparative_superiority='Not Assessed', resource_usage={k: summarize_resources(v) for k,v in resource_usage.items()},
                 spread=[dict(condition=k[0], anchor=k[1], scores=v, spread=max(v)-min(v)) for k,v in sorted(groups.items())])
+
+
+def summarize_resources(records):
+    def nonnegative(value):
+        import math
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+    durations = [r.get('duration_seconds') for r in records]
+    usage = [r.get('token_usage') for r in records]
+    return dict(sessions=len(records),
+        duration_seconds=sum(durations) if records and all(nonnegative(x) for x in durations) else None,
+        input_tokens=sum(x['input_tokens'] for x in usage) if records and all(isinstance(x, dict) and nonnegative(x.get('input_tokens')) for x in usage) else None,
+        output_tokens=sum(x['output_tokens'] for x in usage) if records and all(isinstance(x, dict) and nonnegative(x.get('output_tokens')) for x in usage) else None,
+        monetary_cost=None, cost_status='Not Assessed; token usage is not a price estimate')
+
 
 
 def main():

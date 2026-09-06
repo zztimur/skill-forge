@@ -718,7 +718,7 @@ def run_release_tag_verification_case() -> dict[str, Any]:
             )
             workflow_text = release_workflow.read_text(encoding="utf-8")
             required_workflow_fragments = (
-                "ref: ${{ github.sha }}",
+                "ref: ${{ needs.validate.outputs.commit }}",
                 "fetch-depth: 0",
                 "fetch-tags: true",
                 "name: Restore and prove annotated release tag",
@@ -728,7 +728,7 @@ def run_release_tag_verification_case() -> dict[str, Any]:
                 'git rev-parse "refs/tags/${RELEASE_TAG}^{commit}"',
                 'test "${tag_type}" = "tag"',
                 'test "${tag_commit}" = "${head_commit}"',
-                'gh release create "${GITHUB_REF_NAME}"',
+                'gh release create "${RELEASE_TAG}"',
                 "--verify-tag",
                 "verify-publication:",
                 "name: Verify published release assets",
@@ -1413,8 +1413,7 @@ def run_workflow_configuration_case() -> dict[str, Any]:
         expected_publication_job = (
             "  verify-publication:\n"
             "    name: Verify published release assets\n"
-            "    if: github.event_name == 'push' && "
-            "startsWith(github.ref, 'refs/tags/')\n"
+            "    if: github.event_name == 'workflow_dispatch'\n"
             "    needs:\n"
             "      - validate\n"
             "      - publish\n"
@@ -1432,7 +1431,7 @@ def run_workflow_configuration_case() -> dict[str, Any]:
         )
         required_publication_fragments = (
             "permissions:\n      contents: read",
-            "ref: ${{ github.sha }}",
+            "ref: ${{ needs.validate.outputs.commit }}",
             "fetch-depth: 0",
             "fetch-tags: true",
             "name: Restore and prove published annotated tag",
@@ -1468,22 +1467,14 @@ def run_workflow_configuration_case() -> dict[str, Any]:
             "ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0",
         ]
         expected_release_actions = [
-            "uses: actions/checkout@"
-            "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
-            "uses: actions/setup-python@"
-            "ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0",
-            "uses: actions/upload-artifact@"
-            "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
-            "uses: actions/upload-artifact@"
-            "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
-            "uses: actions/download-artifact@"
-            "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1",
-            "uses: actions/checkout@"
-            "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
-            "uses: actions/setup-python@"
-            "ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0",
-            "uses: actions/download-artifact@"
-            "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1",
+            "uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
+            "uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0",
+            "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+            "uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
+            "uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1",
+            "uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
+            "uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0",
+            "uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1",
         ]
 
         def action_lines(source: str) -> list[str]:
@@ -1537,6 +1528,15 @@ def run_bounded_runner_case() -> dict[str, Any]:
                 expected_exit=0, actual_exit=proc.returncode, expected_code="fail-closed controller boundaries",
                 result="PASS" if proc.returncode == 0 else "FAIL",
                 reason="" if proc.returncode == 0 else proc.stderr[-3000:])
+
+
+def run_new_source_case(filename: str) -> dict[str, Any]:
+    proc = subprocess.run([sys.executable, "-B", "-S", str(SCRIPT_DIR.parent / "evals" / filename)],
+                          capture_output=True, text=True, encoding="utf-8", timeout=90, check=False)
+    return dict(name=filename, fixture="evals/" + filename, expected_exit=0,
+                actual_exit=proc.returncode, expected_code="behavioral source regression",
+                result="PASS" if proc.returncode == 0 else "FAIL",
+                reason="" if proc.returncode == 0 else (proc.stdout + proc.stderr)[-3000:])
 
 
 def render_results(results: list[dict[str, Any]]) -> int:
@@ -1606,6 +1606,9 @@ def main() -> int:
         ("CI workflow configuration", run_workflow_configuration_case),
         ("synthetic agent evaluation harness", run_eval_harness_case),
         ("bounded execution controller", run_bounded_runner_case),
+        ("transactional installation", lambda: run_new_source_case("test_install_skill.py")),
+        ("measured-quality evaluation", lambda: run_new_source_case("test_measured_quality.py")),
+        ("release evidence receipt", lambda: run_new_source_case("test_release_receipt.py")),
     )
     results = []
     for label, case in cases:

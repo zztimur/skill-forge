@@ -27,10 +27,10 @@ def candidate_files():
     paths = []
     for selector in SKILL_FORGE_RUNTIME_SELECTORS:
         base = ROOT / selector
-        if base.is_file():
+        if base.is_file() and not base.is_symlink() and not base.name.startswith('.env'):
             paths.append(base)
         elif base.is_dir():
-            paths.extend(p for p in base.rglob('*') if p.is_file() and not p.is_symlink() and '__pycache__' not in p.parts)
+            paths.extend(p for p in base.rglob('*') if p.is_file() and not p.is_symlink() and not p.name.startswith('.env') and '__pycache__' not in p.parts)
     return {'skill-forge/' + p.relative_to(ROOT).as_posix(): p.read_text(encoding='utf-8') for p in sorted(paths)}
 
 
@@ -76,22 +76,26 @@ def build_suite():
       anchor_defects={'strong': ['fabricated missing input'], 'poor': ['overbroad trigger', 'undefined destructive transformation'], 'unsafe': ['public disclosure without authorization', 'unauthorized overwrite']})
     contract = json.loads((ROOT / 'references/scoring-contract.json').read_text(encoding="utf-8"))
     schema = (ROOT / 'references/scorecard-schema.md').read_text(encoding="utf-8")
+    reading_set = ['skill-forge/SKILL.md', 'skill-forge/references/evaluation-rubric.md',
+                   'skill-forge/references/severity-framework.md']
+    grading_context = dict(label='fixed-context rubric ablation; not progressive-loading measurement',
+                           reading_set=reading_set, content_hash=digest({k: candidate[k] for k in reading_set}))
     grading = []
     for anchor, artifact in anchor_texts.items():
-        for condition in ('without-skill', 'with-skill'):
+        for condition in ('rubric-only', 'with-skill'):
             for repeat in range(1, 4):
                 prompt = ('Grade the following synthetic skill using only the fixed static evidence below. Return ONLY a JSON scorecard conforming to the schema. '
                   'Use design profile, artifact_eligible=false and no release gates. Cite fixed evidence as Static inspection; no execution or live host claims. '
                   'No tools are available. Include real findings for deductions. Do not report invented checks. Every evidence source must be exactly target/SKILL.md. Every evidence observation must be an exact contiguous excerpt of at least eight characters from the artifact, on one line; put interpretation in criterion rationale and finding impact.\n'
                   'CONTRACT\n' + json.dumps(contract) + '\nSCHEMA\n' + schema + '\nFIXED EVIDENCE: target/SKILL.md\n' + artifact)
                 if condition == 'with-skill':
-                    prompt += '\nCANDIDATE SKILL FORGE INSTRUCTIONS AND REFERENCES\n' + json.dumps({k: v for k, v in candidate.items() if k.endswith('.md')})
+                    prompt += '\nCANDIDATE SKILL FORGE INSTRUCTIONS AND REFERENCES\n' + json.dumps({k: candidate[k] for k in reading_set})
                 grading.append(dict(id='grade-%s-%s-%d' % (anchor, condition, repeat), kind='grading',
                   anchor=anchor, condition=condition, repeat=repeat, prompt=prompt, artifact=artifact,
                   artifact_hash=digest(artifact), candidate_hash=digest(candidate) if condition == 'with-skill' else None,
                   rubric_version=contract['rubric_version'], assessment_profile='design'))
     suite = dict(schema_version=1, behavior=behavior, grading=grading, expectations=expectations,
-                 candidate_hash=digest(candidate), contract=contract)
+                 candidate_hash=digest(candidate), contract=contract, grading_context=grading_context)
     suite['expectations_hash'] = digest(expectations)
     return suite
 

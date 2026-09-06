@@ -58,6 +58,8 @@ SKILL_FORGE_SOURCE_ONLY_SCRIPTS = (
     "scripts/release_skill.py",
     "scripts/run_source_tests.py",
     "scripts/verify_independent_evaluator.py",
+    "scripts/install_skill.py",
+    "scripts/verify_release_receipt.py",
 )
 SKILL_FORGE_RUNTIME_SELECTORS = (
     *SKILL_FORGE_RUNTIME_STATIC_SELECTORS,

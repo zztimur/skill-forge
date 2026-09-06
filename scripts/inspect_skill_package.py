@@ -51,9 +51,11 @@ SECRET_SCAN_NOTE = (
 PORTABLE_FRONTMATTER_KEYS = {"name", "description"}
 # These preserve the previous portable profile: fields are allowed because at
 # least one supported surface understands them, but are surfaced for review.
-OPTIONAL_PLATFORM_FRONTMATTER_KEYS = {"dependencies", "license", "allowed-tools", "metadata", "version"}
-OPENAI_FRONTMATTER_KEYS = {"name", "description", "license", "metadata", "version"}
+OPTIONAL_PLATFORM_FRONTMATTER_KEYS = {"dependencies", "license", "allowed-tools", "metadata", "version", "compatibility"}
+OPENAI_FRONTMATTER_KEYS = {"name", "description", "license", "metadata", "version", "compatibility"}
 AGENT_SKILL_NAME_LIMIT = 64
+AGENT_SKILL_DESCRIPTION_LIMIT = 1024
+AGENT_SKILL_COMPATIBILITY_LIMIT = 500
 OPENAI_SHORT_DESCRIPTION_MIN_LENGTH = 25
 OPENAI_SHORT_DESCRIPTION_MAX_LENGTH = 64
 OPENAI_ICON_FIELDS = ("icon_small", "icon_large")
@@ -229,6 +231,10 @@ FINDING_CODE_CATALOG = (
     "directory_too_many_files",
     "directory_total_size_too_large",
     "directory_unsupported_entry",
+    "frontmatter_description_too_long",
+    "frontmatter_compatibility_invalid",
+    "frontmatter_compatibility_too_long",
+    "frontmatter_metadata_invalid",
     "frontmatter_description_angle_brackets",
     "frontmatter_description_missing",
     "frontmatter_description_short",
@@ -709,7 +715,7 @@ def extract_frontmatter(text: str) -> Tuple[Optional[str], Optional[str]]:
         return None, "frontmatter opening delimiter is invalid"
     for index in range(1, len(lines)):
         if lines[index].startswith("---") and lines[index].strip() == "---":
-            return "\n".join(lines[1:index]), None
+            return "\n".join(lines[1:index]) + "\n", None
     return None, "frontmatter closing delimiter is missing"
 
 
@@ -852,6 +858,26 @@ def parse_yaml_float(value: str, line_number: int) -> float:
     return parsed
 
 
+def parse_yaml_mapping_key(raw_key: str, line_number: int) -> str:
+    """Keep supported quoted keys as strings; never coerce YAML scalar keys."""
+    raw_key = raw_key.strip()
+    if raw_key.startswith(("!", "&", "*")):
+        raise YamlParseError(line_number, "YAML tags, anchors, and aliases are not supported")
+    if raw_key.startswith(("?", "[", "{")):
+        raise YamlUnsupportedSyntaxError(line_number, "complex mapping keys are not supported by this parser")
+    quoted = raw_key.startswith(("'", '"'))
+    key = parse_yaml_scalar(raw_key, line_number) if quoted else raw_key
+    if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", key):
+        raise YamlUnsupportedSyntaxError(line_number, "mapping key syntax is not supported by this parser")
+    if not quoted:
+        # Decimal forms with leading zeros/underscores and hexadecimal/octal
+        # keys must not slip through the intentionally restricted value parser.
+        numeric = re.fullmatch(r"(?:[0-9][0-9_]*|0[xX][0-9a-fA-F_]+|0[oO][0-7_]+)", key)
+        if numeric or not isinstance(parse_yaml_scalar(key, line_number), str):
+            raise YamlParseError(line_number, "mapping keys must be strings; quote numeric, boolean or null keys")
+    return key
+
+
 def parse_yaml_scalar(value: str, line_number: int, depth: int = 0) -> Any:
     if depth > MAX_YAML_NESTING_DEPTH:
         raise YamlUnsupportedSyntaxError(
@@ -893,13 +919,9 @@ def parse_yaml_scalar(value: str, line_number: int, depth: int = 0) -> Any:
             if ":" not in item:
                 raise YamlParseError(line_number, "flow mapping item is not a key-value pair")
             key, raw_value = item.split(":", 1)
-            key = key.strip()
-            if key.startswith(("!", "&", "*")):
-                raise YamlParseError(line_number, "YAML tags, anchors, and aliases are not supported")
+            key = parse_yaml_mapping_key(key, line_number)
             if raw_value.strip().startswith(("!", "&", "*")):
                 raise YamlParseError(line_number, "YAML tags, anchors, and aliases are not supported")
-            if key.startswith(("?", "[", "{", "'", '"')) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", key):
-                raise YamlUnsupportedSyntaxError(line_number, f"flow mapping key syntax {key!r} is not supported by this parser")
             if key in result:
                 raise YamlParseError(line_number, f"duplicate key {key!r}")
             result[key] = parse_yaml_scalar(raw_value, line_number, depth + 1)
@@ -935,6 +957,7 @@ class RestrictedYamlParser:
 
     def __init__(self, text: str):
         self.lines = text.splitlines()
+        self.ends_with_linebreak = text.endswith(("\n", "\r"))
         self.index = 0
 
     def ensure_depth(self, depth: int, line_number: int) -> None:
@@ -983,16 +1006,10 @@ class RestrictedYamlParser:
         if ":" not in content:
             raise YamlParseError(line_number, "mapping entry is missing ':'")
         key, raw_value = content.split(":", 1)
-        key = key.strip()
+        key = parse_yaml_mapping_key(key, line_number)
         value = strip_yaml_inline_comment(raw_value).strip()
-        if key.startswith(("!", "&", "*")):
-            raise YamlParseError(line_number, "YAML tags, anchors, and aliases are not supported")
         if value.startswith(("!", "&", "*")):
             raise YamlParseError(line_number, "YAML tags, anchors, and aliases are not supported")
-        if key.startswith(("?", "[", "{", "'", '"')):
-            raise YamlUnsupportedSyntaxError(line_number, "complex or quoted mapping keys are not supported by this parser")
-        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", key):
-            raise YamlUnsupportedSyntaxError(line_number, f"mapping key syntax {key!r} is not supported by this parser")
         if raw_value and not (raw_value[0].isspace() or raw_value[0] == "#"):
             raise YamlParseError(line_number, "a mapping ':' must be followed by whitespace or a comment")
         return key, value or None
@@ -1006,7 +1023,7 @@ class RestrictedYamlParser:
         depth: int,
     ) -> None:
         if raw_value in {"|", "|-", "|+", ">", ">-", ">+"}:
-            result[key] = self.parse_block_scalar(parent_indent, raw_value.startswith(">"))
+            result[key] = self.parse_block_scalar(parent_indent, raw_value)
         elif raw_value is None:
             result[key] = self.parse_child_or_null(parent_indent, depth + 1)
         else:
@@ -1067,7 +1084,7 @@ class RestrictedYamlParser:
             raw_value = strip_yaml_inline_comment(content[1:]).strip()
             self.index += 1
             if raw_value in {"|", "|-", "|+", ">", ">-", ">+"}:
-                result.append(self.parse_block_scalar(indent, raw_value.startswith(">")))
+                result.append(self.parse_block_scalar(indent, raw_value))
             elif raw_value:
                 if re.search(r":(?=\s|$)", raw_value) and not raw_value.startswith(("'", '"', "[", "{")):
                     result.append(self.parse_inline_sequence_mapping(raw_value, indent, self.index, depth + 1))
@@ -1088,7 +1105,7 @@ class RestrictedYamlParser:
             return self.parse_sequence(child_indent, depth)
         return self.parse_mapping(child_indent, depth=depth)
 
-    def parse_block_scalar(self, parent_indent: int, folded: bool) -> str:
+    def parse_block_scalar(self, parent_indent: int, indicator: str) -> str:
         block: List[str] = []
         while self.index < len(self.lines):
             raw = self.lines[self.index]
@@ -1097,27 +1114,31 @@ class RestrictedYamlParser:
             block.append(raw)
             self.index += 1
         non_blank = [raw for raw in block if raw.strip()]
-        if not non_blank:
-            return ""
-        common_indent = min(len(raw) - len(raw.lstrip(" ")) for raw in non_blank)
-        content_lines = ["" if not raw.strip() else raw[common_indent:] for raw in block]
-        while content_lines and content_lines[-1] == "":
-            content_lines.pop()
-        if not folded:
-            return "\n".join(content_lines)
-        parts: List[str] = []
-        run: List[str] = []
-        for line in content_lines:
-            if line:
-                run.append(line)
+        common_indent = min((len(raw) - len(raw.lstrip(" ")) for raw in non_blank), default=0)
+        lines = [raw[common_indent:] if raw.strip() else "" for raw in block]
+        terminal_break = bool(block) and (self.index < len(self.lines) or self.ends_with_linebreak)
+        if indicator.startswith("|"):
+            value = "\n".join(lines) + ("\n" if terminal_break else "")
+        else:
+            # Fold only adjacent ordinary text lines. Blank paragraphs and
+            # more-indented lines preserve their YAML-defined line breaks.
+            positions = [i for i, line in enumerate(lines) if line]
+            if not positions:
+                value = "\n" * (max(0, len(lines)-1) + int(terminal_break))
             else:
-                if run:
-                    parts.append(" ".join(item.strip() for item in run))
-                    run = []
-                parts.append("")
-        if run:
-            parts.append(" ".join(item.strip() for item in run))
-        return "\n".join(parts)
+                value = "\n" * positions[0] + lines[positions[0]]
+                for previous, current in zip(positions, positions[1:]):
+                    blanks = current - previous - 1
+                    indented = lines[previous].startswith((" ", "\t")) or lines[current].startswith((" ", "\t"))
+                    separator = "\n"*(blanks+1) if indented else "\n"*blanks if blanks else " "
+                    value += separator + lines[current]
+                value += "\n" * (len(lines)-positions[-1]-1 + int(terminal_break))
+        if indicator.endswith("+"):
+            return value
+        stripped = value.rstrip("\n")
+        if indicator.endswith("-") or not non_blank:
+            return stripped
+        return stripped + ("\n" if value.endswith("\n") else "")
 
 
 def parse_yaml_mapping(text: str) -> Dict[str, Any]:
@@ -1192,10 +1213,26 @@ def validate_frontmatter(frontmatter: Dict[str, Any], target: str = "portable") 
         findings.append(finding("error", "frontmatter_description_invalid", "frontmatter description must be a non-empty string when present"))
     elif has_description:
         desc = description.strip()
+        if len(description) > AGENT_SKILL_DESCRIPTION_LIMIT:
+            findings.append(finding("error", "frontmatter_description_too_long",
+                                    "frontmatter description exceeds the Agent Skills 1024-character limit",
+                                    length=len(description), limit=AGENT_SKILL_DESCRIPTION_LIMIT))
         if re.search(r"</?[A-Za-z][^>]*>", desc):
             findings.append(finding("error", "frontmatter_description_angle_brackets", "frontmatter description should not contain XML/HTML tags"))
-        # Length and English keywords cannot establish semantic trigger quality.
+        # Short length and English keywords cannot establish semantic trigger quality.
         # Keep objective validity checks here; qualitative evidence belongs in review.
+    if "compatibility" in frontmatter:
+        compatibility = frontmatter["compatibility"]
+        if not isinstance(compatibility, str) or not compatibility.strip():
+            findings.append(finding("error", "frontmatter_compatibility_invalid", "compatibility must be a non-empty string"))
+        elif len(compatibility) > AGENT_SKILL_COMPATIBILITY_LIMIT:
+            findings.append(finding("error", "frontmatter_compatibility_too_long",
+                                    "compatibility exceeds the Agent Skills 500-character limit",
+                                    length=len(compatibility), limit=AGENT_SKILL_COMPATIBILITY_LIMIT))
+    if "metadata" in frontmatter:
+        metadata = frontmatter["metadata"]
+        if not isinstance(metadata, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in metadata.items()):
+            findings.append(finding("error", "frontmatter_metadata_invalid", "metadata must map strings to strings"))
     return findings
 
 

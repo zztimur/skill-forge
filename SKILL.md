@@ -5,10 +5,8 @@ description: Audit, validate, pressure-test, and grade OpenAI or portable Agent 
 
 # Skill Forge
 
-Evaluate Agent Skills from evidence. Inspect the exact artifact, pressure-test
-instructions, separate trusted validation from self-tests, and issue quality
-and release verdicts. Treat files as truth; never invent
-structure, validator results, or behavior.
+Audit exact Agent Skill artifacts from evidence. Keep quality, validation,
+pressure tests and release decisions distinct; never invent behavior.
 
 ## Route the Request and Select Scope
 
@@ -30,8 +28,7 @@ wording without it is Evaluation. Evaluation and Validation never authorize
 edits, packaging, installation, commits, pushes, publication, or external
 actions. Repair followed by Release gate retains both phases and evidence sets.
 
-Use the named artifact. If absent, select the sole unambiguous candidate; ask
-when several are plausible. A pasted `SKILL.md` is draft-only. An installed
+Use the named artifact; otherwise select the sole candidate or ask when ambiguous. A pasted `SKILL.md` is draft-only. An installed
 runtime proves behavior, not repair or packaging authority; locate its source
 checkout first. Review portfolio Skills separately.
 
@@ -86,7 +83,9 @@ Not Assessed.
    secrets or sensitive PII; report path, finding type, and a safe redacted
    fingerprint.
 
-6. **Choose report depth.**
+6. **Choose report depth.** Separate package integrity, inferred design, observed
+   artifact/agent behavior and host results; release Pass does not prove improvement.
+
    - **Compact:** evidence boundary, safety findings, concise verdict, and top
      fixes.
    - **Standard:** decision, top findings, score scope, coverage, and next actions
@@ -132,8 +131,8 @@ rules synchronized.
 Release loads `references/audit-contract.json`,
 `references/release-gate-checklist.md`, and
 `references/runtime-manifest-schema.md`, `references/release-report-template.md`,
-and `references/release-evaluator-provenance.md`. Historical bootstrap details
-load only for that Release evidence task.
+and `references/release-evaluator-provenance.md`. Source maintainers additionally
+load `references/release-receipt.md` for publication evidence. Load historical bootstrap details only when relevant.
 
 ### Human-only references
 
@@ -147,7 +146,7 @@ Agent-invoked runtime tools: `scripts/inspect_skill_package.py`,
 `scripts/validate_audit_contract.py`. Imported runtime modules:
 `scripts/portable_zip_paths.py` and `scripts/runtime_manifest.py`. Source-only
 maintenance is declared below.
-<!-- skill-forge:source-only scripts/generate_release_notes.py scripts/release_metadata.py scripts/release_skill.py scripts/run_source_tests.py scripts/verify_independent_evaluator.py -->
+<!-- skill-forge:source-only scripts/generate_release_notes.py scripts/release_metadata.py scripts/release_skill.py scripts/run_source_tests.py scripts/verify_independent_evaluator.py scripts/install_skill.py scripts/verify_release_receipt.py -->
 
 Maintenance runs tests. Authorized Release work builds from
 a commit, source-proves and extracts the archive, then runs packaged tests.

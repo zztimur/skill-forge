@@ -6,6 +6,18 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+### Added
+
+- Transactional verified-archive installation with rollback and obsolete-file removal.
+- Reviewer-pinned release receipts and exact-commit CI checks before dispatch-authorized publication. Tag pushes build candidates without publishing.
+- Explicit tool-free API grading controller and paired outcome comparisons; live evidence remains unavailable until actual sessions run.
+
+### Fixed
+
+- Enforce published description/compatibility field limits and metadata string maps; previously accepted invalid fields now fail strict inspection.
+- Remove duplicated README score and separate package, design, observed behavior and host evidence.
+- Label rubric-only controls accurately and avoid eagerly loading every reference in grading trials.
+
 ## [v2.1.0] - 2026-09-06
 
 ### Added

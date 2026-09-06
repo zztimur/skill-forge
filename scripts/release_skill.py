@@ -3,8 +3,9 @@
 
 This command is intentionally local-only. It validates the current source,
 promotes CHANGELOG.md's Unreleased section, creates one commit and an
-annotated tag, then prints the explicit push command that will start the
-GitHub Release workflow.
+annotated tag, then prints the push command that builds a validated candidate.
+Publication additionally requires the reviewed receipt and exact-tag workflow
+dispatch described in references/release-receipt.md.
 
 Usage:
     python3 -S scripts/release_skill.py patch --dry-run
@@ -316,8 +317,9 @@ def prepare_release(level: str, dry_run: bool) -> None:
     updated_changelog = promote_unreleased(changelog, next_tag, release_date)
 
     if dry_run:
-        print(f"Dry run passed. Would commit CHANGELOG.md, create annotated tag {next_tag}, then run:")
+        print(f"Dry run passed. Would commit CHANGELOG.md, create annotated tag {next_tag}, then build a validated candidate with:")
         print(f"  git push --atomic origin main {next_tag}")
+        print("Publication requires a reviewed receipt and exact-tag Release Skill dispatch; see references/release-receipt.md.")
         return
 
     CHANGELOG.write_text(updated_changelog, encoding="utf-8")
@@ -395,8 +397,9 @@ def prepare_release(level: str, dry_run: bool) -> None:
         environment_overrides={"GIT_COMMITTER_DATE": timestamp_text},
     )
     verify_tag(next_tag)
-    print(f"Prepared local release {next_tag}. Publish it with:")
+    print(f"Prepared local release {next_tag}. Build its validated candidate with:")
     print(f"  git push --atomic origin main {next_tag}")
+    print("Publication requires a reviewed receipt and exact-tag Release Skill dispatch; see references/release-receipt.md.")
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:

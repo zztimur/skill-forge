@@ -418,7 +418,7 @@ their meaning.
 
 `directory_depth_exceeded` `directory_file_directory_prefix_conflict` `directory_file_outside_root` `directory_file_too_large` `directory_nonportable_path` `directory_portable_identity_collision` `directory_root_lstat_failed` `directory_root_resolve_failed` `directory_root_symlink` `directory_scan_incomplete` `directory_symlink_found` `directory_too_many_entries` `directory_too_many_entries_in_directory` `directory_too_many_files` `directory_total_size_too_large` `directory_unsupported_entry`
 
-`frontmatter_description_angle_brackets` `frontmatter_description_missing` `frontmatter_description_short` `frontmatter_description_weak_trigger` `frontmatter_invalid_name` `frontmatter_missing_or_invalid` `frontmatter_name_directory_comparison_invalid` `frontmatter_name_directory_mismatch` `frontmatter_name_missing` `frontmatter_name_too_long` `frontmatter_parse_error` `frontmatter_platform_optional_keys` `frontmatter_unavailable` `frontmatter_unexpected_keys` `frontmatter_yaml_unsupported`
+`frontmatter_description_too_long` `frontmatter_compatibility_invalid` `frontmatter_compatibility_too_long` `frontmatter_metadata_invalid` `frontmatter_description_angle_brackets` `frontmatter_description_missing` `frontmatter_description_short` `frontmatter_description_weak_trigger` `frontmatter_invalid_name` `frontmatter_missing_or_invalid` `frontmatter_name_directory_comparison_invalid` `frontmatter_name_directory_mismatch` `frontmatter_name_missing` `frontmatter_name_too_long` `frontmatter_parse_error` `frontmatter_platform_optional_keys` `frontmatter_unavailable` `frontmatter_unexpected_keys` `frontmatter_yaml_unsupported`
 
 `missing_resource_reference`
 
@@ -569,3 +569,5 @@ byte, and depth limits. These graph limits are recorded in `effective_limits`.
 A document or edge limit, unreadable document, or undecodable document produces
 `resource_graph_incomplete`. Dependency completeness is separate from
 `coverage_complete`, which still describes secret and dangerous-command scans.
+
+The published Agent Skills field constraints (verified 2026-09-06) apply in both targets: description at most 1024 characters, optional compatibility a nonempty string at most 500 characters, and metadata a string-to-string map. These are validity checks, not description-quality heuristics. New finding codes identify each invalid field without emitting its value.

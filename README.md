@@ -37,17 +37,41 @@ Use $skill-forge to release-gate /path/to/my-skill.zip for OpenAI.
 
 ### Checksum-verified release install
 
-Use the published runtime-only archive when you want the smaller release artifact instead of the current GitHub source. On macOS or Linux:
+Use a reviewed, exact release tag and its runtime-only archive when you want a reproducible installation. The installer requires Python 3.9 or newer and a separate trusted source checkout: it is a source-maintenance helper, excluded from the installed runtime ZIP. Obtain the source at a reviewed full commit ID that contains `scripts/install_skill.py`; older releases may not include this helper:
 
 ```bash
-curl -fL https://github.com/zztimur/skill-forge/releases/latest/download/skill-forge.zip -o /tmp/skill-forge.zip
-curl -fL https://github.com/zztimur/skill-forge/releases/latest/download/skill-forge.zip.sha256 -o /tmp/skill-forge.zip.sha256
-python3 -S -c 'import hashlib, pathlib; z = pathlib.Path("/tmp/skill-forge.zip"); expected = pathlib.Path("/tmp/skill-forge.zip.sha256").read_text().split()[0]; actual = hashlib.sha256(z.read_bytes()).hexdigest(); assert actual == expected, "checksum mismatch"'
-mkdir -p "$HOME/.agents/skills"
-python3 -S -m zipfile -e /tmp/skill-forge.zip "$HOME/.agents/skills"
+INSTALLER_COMMIT=REPLACE_WITH_REVIEWED_FULL_COMMIT_ID
+git clone --no-checkout https://github.com/zztimur/skill-forge.git skill-forge-installer-source
+cd skill-forge-installer-source
+git checkout --detach "$INSTALLER_COMMIT"
+git rev-parse HEAD
 ```
 
-On Windows, download the same two release assets, compare the archive's `Get-FileHash -Algorithm SHA256` result with the checksum file, and extract it under `$HOME\.agents\skills`. For a repository-scoped manual install, extract into `$REPO_ROOT/.agents/skills` instead. Codex normally detects newly installed skills automatically; restart it if Skill Forge does not appear.
+Confirm the displayed commit matches the independently reviewed ID before running its helper. Choose the archive tag explicitly; do not combine assets fetched through a moving `latest` URL. Download both assets from the same tag using the GitHub CLI:
+
+```bash
+RELEASE_TAG=vX.Y.Z # Replace with the exact release tag you reviewed.
+DOWNLOAD_DIR="$HOME/Downloads/skill-forge-$RELEASE_TAG"
+gh release download "$RELEASE_TAG" --repo zztimur/skill-forge \
+  --pattern skill-forge.zip --pattern skill-forge.zip.sha256 --dir "$DOWNLOAD_DIR"
+```
+
+Review that release's checksum file and copy its 64-character SHA-256 into `EXPECTED_SHA256` below. From this reviewed source checkout, run:
+
+```bash
+EXPECTED_SHA256=REPLACE_WITH_REVIEWED_64_CHARACTER_SHA256
+mkdir -p "$HOME/.agents/skills"
+python3 -S scripts/install_skill.py "$DOWNLOAD_DIR/skill-forge.zip" \
+  --sha256 "$EXPECTED_SHA256" --skills-dir "$HOME/.agents/skills"
+```
+
+The helper makes no downloads. It checks the supplied digest, archive preflight, canonical manifest, package shape, and strict inspections before installation. These checks prove archive integrity; source provenance remains a separate check with `scripts/package_skill.py verify ARCHIVE --source-repo CHECKOUT --json`.
+
+Installation stages outside the active skills directory, then replaces the entire `skill-forge` tree so stale files disappear. Any old tree, including local edits, remains at the backup path printed in the JSON result. Repeating an install with identical files and modes returns `unchanged`. Symlinks, hardlinks in an existing installation, special files, and unsupported filesystem layouts fail closed. Use real paths without symlink ancestors, and keep the skills directory and its parent on the same filesystem. Do not edit or run another installation during the swap. Handled errors and keyboard interruptions roll back; power loss or forced process termination can require manual recovery from the printed or retained `.skill-forge-install-*` directory. The two directory renames have a brief interval where the active path is absent.
+
+If the existing installation contains `.env` or `.env.*` paths, the helper refuses the installation before opening those files and leaves the old tree unchanged.
+
+For a project installation, create its `.agents/skills` directory first and pass that real path as `--skills-dir`. On Windows, download both assets from the same exact release tag and invoke the same Python helper with native paths and the reviewed digest. Codex normally detects newly installed skills automatically; restart it if Skill Forge does not appear.
 
 ## Run the standalone inspector
 
@@ -73,14 +97,13 @@ The bundled [example evaluation](references/example-report.md) shows how a struc
 
 ```text
 Release gate verdict: Fail
-Score: 74/100
 Blocking gates:
 - G05: Trigger description is too thin
 - G14: A bundled script is orphaned
 - G20: Wrong-input and privacy pressure tests fail
 ```
 
-The score and verdict come from the full audit workflow, not from the standalone inspector alone.
+The linked example contains the complete scoped score and assessment evidence. Its score and verdict come from the full audit workflow, not from the standalone inspector alone.
 
 ## How it differs from basic package linting
 
@@ -90,7 +113,7 @@ The score and verdict come from the full audit workflow, not from the standalone
 | Do archive paths pass bounded safety checks, and do referenced resources exist? | Varies | Path, symlink, size, reference, and coverage checks |
 | Will the skill trigger and behave well on difficult requests? | Usually out of scope | Qualitative pressure-test workflow |
 | Did an official validator, package self-test, or reviewer produce the evidence? | Often combined or omitted | Reported separately |
-| Is the exact artifact ready to ship? | Not usually answered | Gated verdict with blockers, score caps, and evidence links |
+| Is the exact artifact ready to ship? | Not usually answered | Separate quality, coverage and release verdicts with evidence links |
 
 `portable` is a conservative shared baseline, not universal host certification. Secret and dangerous-command scanning is heuristic and non-exhaustive, and audits remain read-only unless repair is explicitly requested.
 
@@ -205,7 +228,7 @@ every third-party GitHub Action is pinned to an immutable commit SHA.
 
 ## Versioning and changelog
 
-Releases are tag-driven and use ASCII-only semantic-version tags:
+Release candidates use ASCII-only semantic-version tags:
 `vMAJOR.MINOR.PATCH`.
 `CHANGELOG.md` is the committed release record: add user-visible changes under
 **Unreleased** as normal work lands, then use the local release command to
@@ -230,8 +253,11 @@ git push --atomic origin main "$TAG"
 
 Use `minor` or `major` instead of `patch` when the change warrants it. A version
 does not change merely because source files change; it changes only when this
-release command is intentionally run. The tag push starts the GitHub Release
-workflow. These controls establish local metadata integrity, not cryptographic
+release command is intentionally run. The tag push builds a validated candidate;
+it does not publish a GitHub Release. Complete the independent review, capture
+the externally pinned receipt, and dispatch publication for the exact tag as
+described in the [release receipt procedure](references/release-receipt.md).
+These controls establish local metadata integrity, not cryptographic
 author identity, release authorization, or remote-origin authenticity.
 
 ## Release-gate workflow
@@ -375,10 +401,15 @@ extracts it, runs the packaged runtime suite, verifies both canonical
 profiles, and writes `skill-forge.zip.sha256` beside the ZIP. On a tag, it also
 verifies the exact release metadata and generates deterministic notes from the
 tagged commit's changelog blob rather than mutable working-tree text. Only the
-dependent publication job receives `contents: write`; it attaches both the ZIP
-and its SHA-256 checksum to the GitHub Release, refusing to create a release if
-the remote tag is absent. A manual dispatch stops after read-only validation
-and uploads the ZIP plus checksum as a workflow artifact.
+dependent publication job receives `contents: write`. Tag pushes stop after
+validation and upload the candidate assets. Publication requires a manual
+`workflow_dispatch` with the exact `release_tag`, successful capture
+`receipt_run_id`, and reviewer-trusted `receipt_sha256`. Both validation and
+publication verify the receipt, independent evaluator report, and all seven
+successful Self Tests jobs on the exact commit. The publication job rechecks
+live CI and the remote tag immediately before attaching the ZIP and checksum
+to a GitHub Release. Follow the [release receipt procedure](references/release-receipt.md)
+to upload reviewed evidence without changing the release commit.
 
 ## Repository layout
 

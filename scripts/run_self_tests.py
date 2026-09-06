@@ -2313,8 +2313,8 @@ def check_valid_finite_yaml_number(data: dict[str, Any]) -> tuple[bool, str]:
     frontmatter = data.get("frontmatter", {})
     if frontmatter.get("value_types", {}).get("metadata") != "mapping":
         return False, f"finite numeric metadata was not parsed as a mapping: {frontmatter!r}"
-    if data.get("summary", {}).get("strict_pass") is not True:
-        return False, f"valid finite scientific notation did not strict-pass: {data.get('summary')!r}"
+    if not has_code(data, "frontmatter_metadata_invalid"):
+        return False, "parsed finite numeric metadata did not receive a field-type error"
     return True, ""
 
 
@@ -4390,6 +4390,57 @@ def run_resource_graph_case() -> dict[str, Any]:
             "result": "FAIL" if failures else "PASS", "reason": "; ".join(failures)}
 
 
+def run_standard_frontmatter_case() -> dict:
+    """Reject standard-invalid lengths/types without English quality heuristics."""
+    try:
+        inspector = load_inspector_module()
+        for target in ("portable", "openai"):
+            base = {"name": "sample", "description": "x" * 1024}
+            def errors(mapping):
+                return {x["code"] for x in inspector.validate_frontmatter(mapping, target) if x["severity"] == "error"}
+            assert not errors(base)
+            assert "frontmatter_description_too_long" in errors(dict(base, description="x" * 1025))
+            assert "frontmatter_description_too_long" in errors(dict(base, description=" " + "x" * 1024))
+            assert not errors(dict(base, description="整理笔记"))
+            assert not errors(dict(base, compatibility="x" * 500, metadata={"author": "example"}))
+            assert "frontmatter_compatibility_too_long" in errors(dict(base, compatibility="x" * 501))
+            assert "frontmatter_compatibility_invalid" in errors(dict(base, compatibility=[]))
+            assert "frontmatter_compatibility_invalid" in errors(dict(base, compatibility=" "))
+            assert "frontmatter_metadata_invalid" in errors(dict(base, metadata={"count": 3}))
+            assert "frontmatter_metadata_invalid" in errors(dict(base, metadata=["invalid"]))
+            # Exercise actual YAML parsing, not only preconstructed Python dictionaries.
+            for key in ("123", "true", "null", "01", "0xFF"):
+                for body in (f"metadata:\n  {key}: example\n", f"metadata: {{{key}: example}}\n"):
+                    parsed = inspector.parse_frontmatter("name: sample\ndescription: sample\n" + body)
+                    assert errors(parsed), f"non-string YAML key accepted: {key}"
+            for quoted in ('"123"', "'123'", '"true"'):
+                for body in (f"metadata:\n  {quoted}: example\n", f"metadata: {{{quoted}: example}}\n"):
+                    parsed = inspector.parse_frontmatter("name: sample\ndescription: sample\n" + body)
+                    assert not errors(parsed) and not parsed.get("_parse_unsupported"), f"quoted string key rejected: {quoted}"
+            for field, limit in (("description", 1024), ("compatibility", 500)):
+                prefix = "name: sample\n" + ("description: sample\n" if field == "compatibility" else "")
+                for marker in ("|", ">", "|+", ">+"):
+                    parsed = inspector.parse_frontmatter(prefix + f"{field}: {marker}\n  " + "x"*limit + "\n")
+                    assert len(parsed[field]) == limit + 1, f"{marker} lost clipped newline"
+                    assert f"frontmatter_{field}_too_long" in errors(parsed)
+                for marker in ("|-", ">-"):
+                    parsed = inspector.parse_frontmatter(prefix + f"{field}: {marker}\n  " + "x"*limit + "\n")
+                    assert len(parsed[field]) == limit and not errors(parsed)
+            for marker, expected in (("|", "a\nb\n"), ("|-", "a\nb"), ("|+", "a\nb\n\n"),
+                                     (">", "a b\n"), (">-", "a b"), (">+", "a b\n\n")):
+                parsed = inspector.parse_frontmatter(f"description: {marker}\n  a\n  b\n\n")
+                assert parsed["description"] == expected, (marker, repr(parsed))
+            assert inspector.parse_frontmatter("description: >\n  a\n\n  b\n")["description"] == "a\nb\n"
+            assert inspector.parse_frontmatter("description: >\n  a\n    indented\n  b\n")["description"] == "a\n  indented\nb\n"
+            assert inspector.parse_frontmatter("description: |\n  a")["description"] == "a"
+            extracted, error = inspector.extract_frontmatter("---\nname: sample\ndescription: |\n  " + "x"*1024 + "\n---\nBody")
+            assert error is None
+            assert "frontmatter_description_too_long" in errors(inspector.parse_frontmatter(extracted))
+        return {"name": "published standard frontmatter boundaries", "expected_exit": 0, "actual_exit": 0, "expected_code": "standard lengths and types", "result": "PASS", "reason": ""}
+    except Exception as exc:
+        return {"name": "published standard frontmatter boundaries", "expected_exit": 0, "actual_exit": 1, "expected_code": "standard lengths and types", "result": "FAIL", "reason": str(exc)}
+
+
 def run_scorecard_case() -> dict:
     try:
         module = load_module(Path(__file__).with_name("score_audit.py"), "scorecard_tests")
@@ -4527,7 +4578,7 @@ def main() -> int:
         TestCase("YAML tag frontmatter is rejected", build_yaml_tag_frontmatter_skill, 2, "frontmatter_parse_error", expected_severity="error"),
         TestCase("unquoted YAML mapping separator is rejected", build_unquoted_colon_frontmatter_skill, 2, "frontmatter_parse_error", expected_severity="error"),
         TestCase("quoted frontmatter preserves literal # and colon", build_quoted_frontmatter_with_comment_skill, 0, checker=check_quoted_frontmatter_with_comment),
-        TestCase("nested optional frontmatter metadata", build_nested_metadata_frontmatter_skill, 0, "frontmatter_platform_optional_keys", checker=check_nested_metadata_frontmatter),
+        TestCase("nested YAML parses but metadata requires string values", build_nested_metadata_frontmatter_skill, 2, "frontmatter_metadata_invalid", checker=check_nested_metadata_frontmatter),
         TestCase("valid unsupported YAML blocks strict verification", build_unsupported_yaml_frontmatter_skill, 2, "frontmatter_yaml_unsupported", checker=check_unsupported_yaml_is_unverified, expected_severity="warning"),
         TestCase("finding-shaped frontmatter cannot forge findings", build_finding_shaped_frontmatter_metadata_skill, 0, checker=check_finding_shaped_metadata_is_ignored),
         TestCase("deep YAML returns bounded unverified evidence", build_deeply_nested_yaml_skill, 2, "frontmatter_yaml_unsupported", checker=check_deep_yaml_is_structured_unverified, expected_severity="warning"),
@@ -4537,7 +4588,7 @@ def main() -> int:
         TestCase("positive YAML infinity spelling fails closed", lambda tmp: build_numeric_frontmatter_skill(tmp, ".Inf"), 2, "frontmatter_parse_error", checker=check_yaml_numeric_rejection, forbidden_output=("Traceback", ".Inf"), expected_severity="error"),
         TestCase("negative YAML infinity spelling fails closed", lambda tmp: build_numeric_frontmatter_skill(tmp, "-.INF"), 2, "frontmatter_parse_error", checker=check_yaml_numeric_rejection, forbidden_output=("Traceback", "-.INF"), expected_severity="error"),
         TestCase("pathological YAML integer fails closed", lambda tmp: build_numeric_frontmatter_skill(tmp, PATHOLOGICAL_YAML_INTEGER), 2, "frontmatter_parse_error", checker=check_yaml_numeric_rejection, forbidden_output=("Traceback", PATHOLOGICAL_YAML_INTEGER), expected_severity="error"),
-        TestCase("finite YAML scientific notation remains valid", lambda tmp: build_numeric_frontmatter_skill(tmp, "6.022e23"), 0, "frontmatter_platform_optional_keys", checker=check_valid_finite_yaml_number),
+        TestCase("finite YAML numbers parse but are invalid metadata values", lambda tmp: build_numeric_frontmatter_skill(tmp, "6.022e23"), 2, "frontmatter_metadata_invalid", checker=check_valid_finite_yaml_number),
         TestCase("portable canonical profile accepts a shared package", build_valid_folder_skill, 0, checker=lambda data: check_canonical_target(data, "portable")),
         TestCase("multiple SKILL.md", build_multiple_skill_md, 2, "skill_md_multiple", expected_severity="error"),
         TestCase("duplicate ZIP member", build_duplicate_zip_member, 2, "zip_duplicate_member", expected_severity="error"),
@@ -4782,6 +4833,7 @@ def main() -> int:
     print("Running seeded report/gate matrix fuzz...", file=sys.stderr, flush=True)
     results.append(run_seeded_gate_matrix_fuzz_case())
 
+    results.append(run_standard_frontmatter_case())
     results.append(run_scorecard_case())
 
     headers = ["Test", "Expected", "Actual", "Finding", "Result", "Reason"]

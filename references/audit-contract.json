@@ -91,7 +91,8 @@
           "license",
           "allowed-tools",
           "metadata",
-          "version"
+          "version",
+          "compatibility"
         ],
         "recommended_fields": []
       },
@@ -102,7 +103,7 @@
       },
       "description_rule": {
         "required": true,
-        "max_length": null,
+        "max_length": 1024,
         "advisory_max_length": 200,
         "listing_max_length": null
       },
@@ -135,7 +136,8 @@
         "optional_fields": [
           "license",
           "metadata",
-          "version"
+          "version",
+          "compatibility"
         ],
         "recommended_fields": []
       },
@@ -146,7 +148,7 @@
       },
       "description_rule": {
         "required": true,
-        "max_length": null,
+        "max_length": 1024,
         "advisory_max_length": null,
         "listing_max_length": null
       },
@@ -467,7 +469,7 @@
         "description"
       ],
       "expected_name_mode": "lowercase-hyphen",
-      "expected_description_max_length": null,
+      "expected_description_max_length": 1024,
       "expected_zip_top_level_folder_required": false,
       "expected_product_upload_limit_bytes": null
     },
@@ -479,7 +481,7 @@
         "description"
       ],
       "expected_name_mode": "lowercase-hyphen_skill_forge_baseline",
-      "expected_description_max_length": null,
+      "expected_description_max_length": 1024,
       "expected_zip_top_level_folder_required": false,
       "expected_product_upload_limit_bytes": null
     }
@@ -1160,5 +1162,12 @@
     "schema_version": 1,
     "score_caps_scope": "legacy_policy_score_only",
     "quality_independent_of_release": true
+  },
+  "standards_provenance": {
+    "source": "https://agentskills.io/specification",
+    "verified_on": "2026-09-06",
+    "scope": "Frontmatter description length, compatibility length/type, metadata string mapping; not native host certification",
+    "description_max_length": 1024,
+    "compatibility_max_length": 500
   }
 }

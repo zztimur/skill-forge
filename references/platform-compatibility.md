@@ -15,6 +15,10 @@ from external product compatibility claims. No product upload limit is encoded
 for either supported profile; the configurable inspector limit is an internal
 resource and safety boundary.
 
+## Published field constraints
+
+Verified 2026-09-06 against the [Agent Skills specification](https://agentskills.io/specification): both profiles enforce the 1024-character description maximum, the optional compatibility string (1–500 characters), and metadata as a string-to-string map. Existing packages with overlong descriptions or invalid field types now fail strict validation. Concise and non-English descriptions receive no automatic quality penalty. These checks do not certify native-host behavior; platform-specific local rules and optional extensions remain distinct.
+
 ## Contract source of truth
 
 Standard audits select the two audit target profiles from inspector output and
