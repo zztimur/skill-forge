@@ -78,3 +78,13 @@ For each issue, include:
 - **Re-test:** the check that would confirm the fix, especially for Critical and High issues
 
 Do not report an Unverified limitation as a verified defect. An Inferred issue may be High or Critical when the predicted impact is serious, but explain the reasoning and what evidence would confirm it.
+
+## Scoring independence
+
+Severity classifies impact and release risk; it does not automatically subtract
+points or cap quality. Use [scoring-contract.json](scoring-contract.json) and
+[scorecard-schema.md](scorecard-schema.md) for anchored deductions. Record a
+finding ID, underlying defect ID, primary criterion ID and evidence IDs. A
+second scoring deduction needs its own distinct impact and evidence. Missing
+evidence remains Not Assessed rather than an assumed defect. Full quality is
+compatible with a blocked release; no numeric result overrides required gates.

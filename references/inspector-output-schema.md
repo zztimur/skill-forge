@@ -317,8 +317,8 @@ For ZIP inputs, the inspector scans every member that passes the configured arch
 | `frontmatter_name_directory_mismatch` | Skill directory name does not match the frontmatter `name`. |
 | `frontmatter_description_missing` | `description` is absent or not a string. |
 | `frontmatter_description_angle_brackets` | Description contains angle brackets. |
-| `frontmatter_description_short` | Description may be too short to trigger reliably. |
-| `frontmatter_description_weak_trigger` | Description may not clearly explain when to use the Skill. |
+| `frontmatter_description_short` | Retired advisory code; no longer emitted. Length alone cannot establish trigger quality. |
+| `frontmatter_description_weak_trigger` | Retired advisory code; no longer emitted. English keyword absence cannot establish trigger quality. |
 | `frontmatter_platform_optional_keys` | Optional platform-specific frontmatter keys are present (`dependencies`, `license`, `allowed-tools`, `metadata`, `version`); info only — validate against the target host. Genuinely unknown keys are still `frontmatter_unexpected_keys`. |
 | `openai_metadata_unreadable` | `agents/openai.yaml`, when present, cannot be read as text. |
 | `openai_metadata_yaml_invalid` | `agents/openai.yaml` is malformed within the restricted YAML subset. |

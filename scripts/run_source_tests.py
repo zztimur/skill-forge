@@ -1462,6 +1462,8 @@ def run_workflow_configuration_case() -> dict[str, Any]:
         expected_self_actions = [
             "uses: actions/checkout@"
             "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
+            "uses: actions/checkout@"
+            "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
             "uses: actions/setup-python@"
             "ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0",
         ]
@@ -1516,6 +1518,25 @@ def run_workflow_configuration_case() -> dict[str, Any]:
         "result": "PASS" if ok else "FAIL",
         "reason": reason,
     }
+
+
+def run_eval_harness_case() -> dict[str, Any]:
+    """Exercise bounded fixtures and fail-closed measurement without model calls."""
+    proc = subprocess.run([sys.executable, "-S", str(SCRIPT_DIR.parent / "evals/test_harness.py")],
+                          capture_output=True, text=True, timeout=60, check=False)
+    return dict(name="synthetic agent evaluation harness", fixture="evals/test_harness.py",
+                expected_exit=0, actual_exit=proc.returncode, expected_code="trace and safety integrity",
+                result="PASS" if proc.returncode == 0 else "FAIL",
+                reason="" if proc.returncode == 0 else proc.stderr[-3000:])
+
+
+def run_bounded_runner_case() -> dict[str, Any]:
+    proc = subprocess.run([sys.executable, "-B", "-S", str(SCRIPT_DIR.parent / "evals/test_bounded_runner.py")],
+                          capture_output=True, text=True, timeout=60, check=False)
+    return dict(name="bounded execution controller", fixture="evals/test_bounded_runner.py",
+                expected_exit=0, actual_exit=proc.returncode, expected_code="fail-closed controller boundaries",
+                result="PASS" if proc.returncode == 0 else "FAIL",
+                reason="" if proc.returncode == 0 else proc.stderr[-3000:])
 
 
 def render_results(results: list[dict[str, Any]]) -> int:
@@ -1583,6 +1604,8 @@ def main() -> int:
         ("runtime/source test boundary", run_runtime_surface_split_case),
         ("cross-platform contract path identity", run_cross_platform_contract_path_case),
         ("CI workflow configuration", run_workflow_configuration_case),
+        ("synthetic agent evaluation harness", run_eval_harness_case),
+        ("bounded execution controller", run_bounded_runner_case),
     )
     results = []
     for label, case in cases:

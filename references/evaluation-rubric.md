@@ -1,6 +1,6 @@
 # Evaluation Rubric
 
-Score the skill out of 100 points, then assign a concise qualitative label. The score measures quality within the inspected evidence boundary; it is not a substitute for a release verdict.
+Assess anchored criteria and report coverage plus a complete profile score when available. The score measures quality within the inspected evidence boundary; it is not a substitute for a release verdict.
 
 Standard audits use this rubric with [`report-template.md`](report-template.md)
 without loading the full Release contract. The source contract validator keeps
@@ -35,41 +35,49 @@ the test result is Not Assessed.
 
 ## Scoring Method
 
-1. Assign a whole-number score for every category.
-2. Show each category's maximum, awarded score, and brief evidence in the report.
-3. Sum the category scores exactly to `/100`; correct arithmetic before assigning a qualitative label.
-4. State whether the score covers a complete package, draft-only text, or a limited adjacent review. Do not translate a draft-only score into a release claim.
-5. Apply the caps below before reporting the final total. A cap means the score must not exceed that value, even if prose quality is otherwise strong.
+Use [scoring-contract.json](scoring-contract.json) rubric 2.0 and
+[scorecard-schema.md](scorecard-schema.md) scorecard 1.0. Every category point
+belongs to a criterion with Pass, Partial and Fail anchors, required methods
+per profile and explicit permitted Not Applicable reasons. Pass earns 1,
+Partial 0.5 and Fail 0 of criterion weight. Not Assessed remains unknown;
+Not Applicable excludes weight only with a permitted, substantiated reason.
 
-## Rating Conversion
+Select design, execution or host independently of the portable/openai target
+compatibility profile. Design assesses documented behavior and static inference;
+it never implies measured execution or host triggering. Execution behavior
+requires Synthetic execution or Live host observation. Host behavior requires
+Live host observation. Direct Static inspection can verify file facts; Static
+simulation remains Inferred under the separate pressure-test policy.
 
-| Score | Qualitative label | Meaning |
-|---:|---|---|
-| 0–39 | Broken or unsafe | Major reliability or safety work is required. |
-| 40–59 | Needs major work | Core behavior needs material repair. |
-| 60–69 | Usable but rough | Useful but materially incomplete. |
-| 70–79 | Solid with material gaps | Sound foundation with release-blocking gaps. |
-| 80–89 | Strong | Good quality with targeted improvements remaining. |
-| 90–99 | Excellent | Complete, reliable work within the assessed scope. |
-| 100 | Exceptional, when justified | Release-ready within the assessed scope; use Exceptional only with the evidence below. |
+Let A be applicable weight, E assessed applicable weight and P earned points.
+Report coverage E/A, and assessed-only score 100*P/E when E>0, otherwise null.
+Publish complete profile quality only when E=A>0. Retain exact fractions and
+round once to one decimal. Never turn a tiny assessed subset into an overall
+score. Every deduction references findings and evidence. One underlying defect
+has one primary scoring criterion; additional deductions require separately
+documented impacts and evidence, not repeated descriptions of the same gap.
 
-The `/100` score is authoritative. A release verdict remains a separate decision.
+Full resource credit is available when the task correctly needs no scripts or
+assets. Full marks require meeting anchors, not manufacturing complexity or
+inventing novel improvements. A complete profile can earn 100 regardless of
+separate release status; severity findings and safety gates retain their force.
+Use profile-specific labels such as "design quality" rather than "release-ready"
+for the score. Unknown evidence does not prove a quality defect.
 
-## Evidence Caps and Release Rules
+## Optional legacy projection and release rules
 
-- Any outstanding **Critical** issue caps the score at **49/100** and prevents a release-ready verdict.
-- Any outstanding **High** issue caps the score at **79/100** and prevents a release-ready verdict.
-- Missing pressure-test evidence, or a failed required pressure test, caps the score at **79/100** unless the test is clearly Not Applicable and the rationale is recorded.
-- A completed **Partial** pressure test counts toward coverage but not behavioral success: it makes G20 Partial and blocks release, but does **not** alone trigger the 79-point missing/failed-evidence cap. Score its observed quality gap normally. G20 therefore measures both category coverage and behavioral success.
-- A draft-only or limited review may receive a design-quality score, but its release verdict is **Not Assessed**, never Pass.
-- An **Installed runtime** proves installed state only and cannot support Pass
-  for a new release. A Release ZIP is eligible as the exact artifact. A mutable
-  source checkout requires an archive built from a committed revision and explicit packaging authority
-  before it can support release evidence.
-- A failed required release gate, strict inspection failure, official-validator failure, or material safety finding prevents a release-ready verdict even if the numeric score is otherwise high.
-- A score of **90+** requires a complete package, no Critical or High issues, meaningful pressure-test evidence, clean applicable validation evidence, and sensible safety and fallback behavior.
-- A `100/100` requires a release-gate Pass within the selected scope and no outstanding issue above Low severity.
-- An optional **Exceptional** label may accompany `100/100` when the complete package is compact, clear, robust under meaningful pressure tests, easy to maintain, and unusually difficult to break in realistic use. State the concrete evidence; never use a numeric score above `100/100`.
+Only an explicitly requested `legacy_policy_score` uses historical caps:
+unresolved Critical caps that projection at 49/100; unresolved High or missing
+or failed required pressure evidence caps it at 79/100. Record every cap reason.
+Never manufacture a legacy score from incomplete quality. A completed Partial
+pressure test blocks release but does not alone trigger the historical cap.
+These caps never alter quality or coverage.
+
+Draft-only and Installed runtime assessments cannot establish new-release Pass.
+A Release ZIP is eligible as the exact artifact; a mutable source checkout
+requires a committed archive and explicit packaging authority. Required gate
+failures, material safety findings, Partial and missing required evidence
+continue to prevent release Pass independently of every numerical score.
 
 The release-verdict roll-up is **Fail > Not Assessed > Partial > Pass** after
 ignoring Not Applicable rows. This precedence is independent of the numeric
@@ -77,3 +85,13 @@ score and of `quality_policy_result`, which remains separate from validator and
 compatibility results.
 
 Use the full range. Do not award a high score merely because the skill is well-written; it must also trigger correctly, handle edge cases, and use resources appropriately.
+
+## Description evidence
+
+Judge the actual input, task, domain, and scope cues, including likely false
+positives and false negatives. Neither description length nor English keywords
+establish quality: concise and non-English descriptions can be specific; long
+vague descriptions can be poor. There is no automatic deduction for fewer than
+80 characters or missing generic English verbs. Inspector validity checks remain
+objective; describe semantic weaknesses with quoted evidence and task impact.
+Static description review cannot verify live host triggering.

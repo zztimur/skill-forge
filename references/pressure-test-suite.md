@@ -171,8 +171,8 @@ Use these probes to pressure test the audit itself before delivering it:
 | Scenario | Expected reporting behavior |
 |---|---|
 | Only a pasted `SKILL.md` was inspected | Label the score draft-only and the release result Not Assessed; do not imply package validation. |
-| A Critical issue is supported by evidence | Put it in the fix list with its evidence and re-test, cap the score at 49, and do not call the skill release-ready. |
-| A High issue remains unresolved | Cap the score at 79 and do not call the skill release-ready, even if other prose is strong. |
+| A Critical issue is supported by evidence | Record its evidence and re-test and block release. Preserve the anchored quality score; only an explicitly requested legacy projection is capped at 49/100. |
+| A High issue remains unresolved | Record the defect and block release. Preserve the anchored quality score; only an explicitly requested legacy projection is capped at 79/100. |
 | A required release gate is Partial, Fail, or Not Assessed | State a non-pass release outcome and explain the missing evidence or blocker. |
 | The score table totals incorrectly or conflicts with the rating | Correct the arithmetic and use the `/100` result as the authoritative grade. |
 | A simulation predicts a problem but no runtime evidence exists | Mark it Inferred, name the source of the prediction, and state how to verify it. |
@@ -180,3 +180,13 @@ Use these probes to pressure test the audit itself before delivering it:
 ## Configurable Limit Test
 
 When the inspector is changed, verify at least one non-default CLI safety limit. Example: run a valid Skill ZIP with `--max-zip-members 1 --strict` and confirm it fails with `zip_too_many_members`. Also verify invalid limit values such as `0` fail clearly during argument parsing.
+
+## Description contrast cases
+
+Compare concise translation ("Translate English text into Spanish."), a specific
+non-English equivalent ("Traduce textos del inglés al español conservando su significado."),
+a long vague description promising help with anything, and a specific domain
+("Extract DOI identifiers from BibTeX records."). Review scope and input/output
+cues, not character counts or generic English keywords. Preserve objective
+validity failures. Record predicted routing as Inferred; live trigger behavior
+requires Live host observation and otherwise remains Not Assessed.

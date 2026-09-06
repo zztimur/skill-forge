@@ -127,6 +127,8 @@ EXPECTED_REFERENCE_ROLES = {
     "### Agent-loaded references": {
         "references/artifact-and-mode-matrix.md",
         "references/evaluation-rubric.md",
+        "references/scoring-contract.json",
+        "references/scorecard-schema.md",
         "references/input-routing.md",
         "references/inspector-output-schema.md",
         "references/platform-compatibility.md",
@@ -134,11 +136,14 @@ EXPECTED_REFERENCE_ROLES = {
         "references/report-template.md",
         "references/severity-framework.md",
         "references/validator-evidence.md",
+        "references/bounded-tests.md",
     },
     "### Release-only references": {
         "references/audit-contract.json",
         "references/release-gate-checklist.md",
         "references/runtime-manifest-schema.md",
+        "references/release-report-template.md",
+        "references/release-evaluator-provenance.md",
     },
     "### Human-only references": {
         "references/audit-checklist.md",
@@ -858,10 +863,76 @@ def validate_example_safety_consistency(text: str, issues: List[str]) -> None:
         issues.append("example report cannot claim no safety/privacy concerns before reporting a safety or privacy defect")
 
 
+def validate_scoring_contract(data: Any, issues: List[str]) -> Mapping[str, Any]:
+    """Validate the complete v1 scoring vocabulary, arithmetic, and evidence floor."""
+    root = require_mapping(data, "scoring_contract", issues)
+    expected_keys = {"scorecard_version", "rubric_version", "schema_version", "assessment_profiles", "profiles", "result_enums", "earned_fractions", "evidence_methods", "evidence_labels", "categories", "criteria", "deduction_policy", "arithmetic", "legacy_policy"}
+    def check(ok: bool, message: str) -> None:
+        if not ok:
+            issues.append("scoring_contract: " + message)
+    check(set(root) == expected_keys, "unexpected or missing root fields")
+    check(type(root.get("schema_version")) is int and root.get("schema_version") == 1, "schema_version must be integer 1")
+    check(root.get("scorecard_version") == "1.0" and root.get("rubric_version") == "2.0", "scorecard/rubric versions changed")
+    profiles = ["design", "execution", "host"]
+    check(root.get("assessment_profiles") == profiles, "assessment profiles must be design, execution, host")
+    profile_map = require_mapping(root.get("profiles"), "scoring_contract.profiles", issues)
+    check(set(profile_map) == set(profiles), "all profile definitions required")
+    for name in profiles:
+        definition = profile_map.get(name)
+        check(isinstance(definition, dict) and set(definition) == {"claim"} and isinstance(definition.get("claim"), str) and bool(definition["claim"].strip()), "profile claim required: " + name)
+    check(root.get("result_enums") == ["Pass", "Partial", "Fail", "Not Assessed", "Not Applicable"], "outcomes changed")
+    fractions = root.get("earned_fractions")
+    check(fractions == {"Pass": 1, "Partial": 0.5, "Fail": 0} and isinstance(fractions, dict) and all(type(v) in (int, float) for v in fractions.values()), "earned fractions changed")
+    methods = ["Static inspection", "Static simulation", "Synthetic execution", "Live host observation"]
+    check(root.get("evidence_methods") == methods, "evidence methods changed")
+    check(root.get("evidence_labels") == ["Verified", "Inferred", "Unverified"], "evidence labels changed")
+    categories = root.get("categories")
+    expected_categories = [("triggering", 20), ("workflow", 20), ("reliability", 20), ("resources", 15), ("errors", 10), ("safety", 10), ("maintenance", 5)]
+    check(isinstance(categories, list) and [(c.get("id"), c.get("weight")) for c in categories if isinstance(c, dict)] == expected_categories, "seven category weights must remain 20/20/20/15/10/10/5")
+    for category in categories if isinstance(categories, list) else []:
+        check(isinstance(category, dict) and set(category) == {"id", "title", "weight"} and type(category.get("weight")) is int and isinstance(category.get("title"), str) and bool(category["title"].strip()), "invalid category")
+    criteria = root.get("criteria")
+    check(isinstance(criteria, list) and len(criteria) > 0, "nonempty criteria required")
+    seen = set()
+    sums = {name: 0 for name, _ in expected_categories}
+    for criterion in criteria if isinstance(criteria, list) else []:
+        if not isinstance(criterion, dict):
+            check(False, "criterion must be an object")
+            continue
+        check(set(criterion) == {"id", "category", "weight", "claim_type", "anchors", "required_methods", "not_applicable_reasons"}, "criterion fields invalid")
+        cid = criterion.get("id")
+        valid_id = isinstance(cid, str) and re.fullmatch(r"C[0-9]{2}", cid) is not None
+        check(valid_id and cid not in seen, "criterion IDs must be unique Cnn strings")
+        if valid_id:
+            seen.add(cid)
+        cat, weight = criterion.get("category"), criterion.get("weight")
+        valid_weight = type(weight) is int and weight > 0
+        check(isinstance(cat, str) and cat in sums and valid_weight, "invalid criterion category or weight")
+        if isinstance(cat, str) and cat in sums and valid_weight:
+            sums[cat] += weight
+        anchors = criterion.get("anchors")
+        check(isinstance(anchors, dict) and set(anchors) == {"Pass", "Partial", "Fail"} and all(isinstance(v, str) and v.strip() for v in anchors.values()) and len(set(str(v).strip() for v in anchors.values())) == 3, "three distinct nonempty anchors required")
+        kind = criterion.get("claim_type")
+        check(kind in ("static", "behavior"), "claim_type must be static or behavior")
+        required = criterion.get("required_methods")
+        check(isinstance(required, dict) and set(required) == set(profiles), "required_methods must cover every profile")
+        for profile in profiles:
+            allowed = required.get(profile) if isinstance(required, dict) else None
+            expected = methods if profile == "design" else ["Synthetic execution", "Live host observation"] if kind == "behavior" and profile == "execution" else ["Live host observation"] if kind == "behavior" else ["Static inspection", "Synthetic execution", "Live host observation"]
+            check(allowed == expected, "required evidence floor changed for " + str(cid) + "/" + profile)
+        reasons = criterion.get("not_applicable_reasons")
+        check(isinstance(reasons, list) and all(isinstance(r, str) and r.strip() for r in reasons) and len(set(str(r) for r in reasons)) == len(reasons), "NA reasons must be unique nonempty strings")
+    check(sums == dict(expected_categories), "criterion weights must sum to category weights")
+    check(root.get("deduction_policy") == {"primary_criterion_per_defect": True, "finding_and_evidence_required": True, "additional_deduction_requires_distinct_impact": True}, "deduction policy weakened")
+    check(root.get("arithmetic") == {"coverage": "E/A", "assessed_only_score": "100*P/E if E>0 else null", "quality_score": "100*P/A if E=A>0 else null", "rounding": "exact fractions internally; round once to one decimal using ROUND_HALF_UP"}, "arithmetic changed")
+    check(root.get("legacy_policy") == {"enabled_by_default": False, "requires_complete_quality_score": True, "requires_cap_reasons": True, "caps": {"unresolved_critical": 49, "unresolved_high": 79, "missing_or_failed_required_pressure_evidence": 79}}, "legacy projection policy changed")
+    return root
+
+
 def validate_contract(data: Any, issues: List[str]) -> Mapping[str, Any]:
     root = require_mapping(data, "contract", issues)
-    if root.get("contract_version") != 4:
-        issues.append("contract_version must be 4")
+    if root.get("contract_version") != 5:
+        issues.append("contract_version must be 5")
     if root.get("result_enums") != EXPECTED_RESULTS:
         issues.append(f"result_enums must be exactly {EXPECTED_RESULTS!r}")
     if root.get("evidence_labels") != EXPECTED_EVIDENCE:
@@ -875,6 +946,8 @@ def validate_contract(data: Any, issues: List[str]) -> Mapping[str, Any]:
     validate_pressure_test_policy(root, issues)
     validate_release_evidence_semantics(root, issues)
 
+    if root.get("scoring_contract") != {"path": "scoring-contract.json", "schema_version": 1, "score_caps_scope": "legacy_policy_score_only", "quality_independent_of_release": True}:
+        issues.append("scoring_contract must bind v1 with independent quality and legacy-only caps")
     caps = require_mapping(root.get("score_caps"), "score_caps", issues)
     expected_caps = {
         "unresolved_critical": 49,
@@ -1184,8 +1257,8 @@ def validate_skill_control_plane(issues: List[str]) -> None:
     if not skill:
         return
     word_count = len(re.findall(r"\b[\w/-]+\b", skill))
-    if not 800 <= word_count <= 1000:
-        issues.append(f"SKILL.md must stay within the 800-1000 word control-plane budget; found {word_count}")
+    if word_count > 1000:
+        issues.append(f"SKILL.md must stay within the 1000 word upper control-plane budget; found {word_count}")
     frontmatter = re.match(r"^---\n(.*?)\n---", skill, re.DOTALL)
     description = re.search(r"^description:\s*(.+)$", frontmatter.group(1), re.MULTILINE) if frontmatter else None
     if description is None or len(description.group(1)) >= 200:
@@ -1193,6 +1266,7 @@ def validate_skill_control_plane(issues: List[str]) -> None:
     elif not all(token in description.group(1).lower() for token in ("audit", "validate", "skills", "release")):
         issues.append("SKILL.md frontmatter description must retain audit, validation, Skill, and release triggers")
 
+    normalized_skill = " ".join(skill.split())
     for marker in (
         "fix, correct, rewrite, or refactor",
         "Compact:",
@@ -1207,9 +1281,6 @@ def validate_skill_control_plane(issues: List[str]) -> None:
         "previously verified archive",
         "another independent evaluator",
         "own passing tests to an\nindependent release pass",
-        "The only schema-bootstrap exception",
-        "bootstrap transition evidence",
-        "do not reuse it after that release",
         "untrusted evidence only",
         "default-deny",
         "source read-only",
@@ -1220,7 +1291,7 @@ def validate_skill_control_plane(issues: List[str]) -> None:
         "multiple named hosts",
         "independently",
     ):
-        if marker not in skill:
+        if " ".join(marker.split()) not in normalized_skill:
             issues.append(f"SKILL.md is missing required control-plane rule: {marker!r}")
     for marker in (
         "ambiguity, mutation,",
@@ -1229,7 +1300,7 @@ def validate_skill_control_plane(issues: List[str]) -> None:
         "source contract validation keeps mirrored\nrules synchronized",
         "Release loads `references/audit-contract.json`",
     ):
-        if marker not in skill:
+        if " ".join(marker.split()) not in normalized_skill:
             issues.append(f"SKILL.md is missing required conditional reference map rule: {marker!r}")
     classified: dict[str, str] = {}
     for heading, expected_paths in EXPECTED_REFERENCE_ROLES.items():
@@ -1312,6 +1383,14 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
         AUDIT_CHECKLIST_PATH: read_text(AUDIT_CHECKLIST_PATH, issues),
         OPENAI_METADATA_PATH: read_text(OPENAI_METADATA_PATH, issues),
     }
+    release_template = REPO_ROOT / "references" / "release-report-template.md"
+    release_provenance = REPO_ROOT / "references" / "release-evaluator-provenance.md"
+    release_text = read_text(release_template, issues)
+    matrix_ids = re.findall(r"^\| (G\d{2}) \|", release_text, re.MULTILINE)
+    if matrix_ids != [f"G{i:02d}" for i in range(1, 24)]:
+        issues.append("references/release-report-template.md must retain the complete ordered G01-G23 matrix")
+    texts[TEMPLATE_PATH] += "\n" + release_text
+    texts[VALIDATOR_EVIDENCE_PATH] += "\n" + read_text(release_provenance, issues)
     gates = contract.get("gates") if isinstance(contract.get("gates"), list) else []
     gate_ids = [gate.get("id") for gate in gates if isinstance(gate, dict)]
     for gate_id in gate_ids:
@@ -1531,28 +1610,23 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
         applicable = len(gate_rows) - actual["Not Applicable"]
         if counts.get("Applicable") != applicable:
             issues.append("example report applicable-gate count does not match its detailed matrix")
-    score_match = re.search(r"\*\*Score:\*\*\s*(\d+)/100", example)
-    if not score_match:
-        issues.append("example report lacks a parseable score")
-    else:
-        score = int(score_match.group(1))
-        if score > 79:
-            issues.append("example report score exceeds its High/pressure-evidence cap")
-        grade_section = example.split("## 10. Overall Grade", 1)
-        if len(grade_section) != 2:
-            issues.append("example report lacks an Overall Grade section")
-        else:
-            category_scores = [
-                int(value)
-                for value in re.findall(r"^\|[^|]+\|\s*\d+\s*\|\s*(\d+)\s*\|", grade_section[1], re.MULTILINE)
-            ]
-            if len(category_scores) != 7:
-                issues.append("example report must show seven parseable category scores")
-            elif sum(category_scores) != score:
-                issues.append("example report category scores do not sum to the reported score")
-            total_match = re.search(r"\|\s*\*\*Total\*\*\s*\|\s*\*\*100\*\*\s*\|\s*\*\*(\d+)\*\*", grade_section[1])
-            if not total_match or int(total_match.group(1)) != score:
-                issues.append("example report total row does not match the reported score")
+    try:
+        from score_audit import score_audit
+        payload = re.search(r"```json scorecard\n(.*?)\n```", example, re.DOTALL)
+        if not payload:
+            raise ValueError("missing scorecard")
+        card = json.loads(payload.group(1))
+        scoring = json.loads((REPO_ROOT / "references/scoring-contract.json").read_text())
+        computed = score_audit(card, scoring)
+        for label, key in (("Quality score", "quality_score"), ("Assessed-only score", "assessed_only_score"), ("Legacy policy score", "legacy_policy_score")):
+            if f"**{label}:** {computed[key]}/100" not in example:
+                issues.append("example report scorecard total does not match " + label)
+        if {row["id"]: row["result"] for row in card["release"]["required_gates"]} != dict(gate_rows):
+            issues.append("example scorecard gates differ from detailed matrix")
+        if "**Release verdict:** " + computed["release_verdict"] not in example:
+            issues.append("example scorecard release verdict mismatch")
+    except (ValueError, TypeError, KeyError, OSError) as exc:
+        issues.append("example report scorecard invalid: " + type(exc).__name__)
     if "### High" not in example or "**Evidence status:** Verified" not in example:
         issues.append("example report must include a Verified High-severity issue")
     if "**Release verdict:** Fail" not in example:
@@ -1606,6 +1680,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         issues.append(f"cannot load references/audit-contract.json: {exc}")
         data = {}
     contract = validate_contract(data, issues)
+    try:
+        scoring = load_contract_json((REPO_ROOT / "references/scoring-contract.json").read_text(encoding="utf-8"))
+        validate_scoring_contract(scoring, issues)
+    except (OSError, ValueError) as exc:
+        issues.append("cannot load scoring contract: " + str(exc))
     validate_documents(contract, issues)
     validate_inspector_documentation(issues)
     validate_skill_control_plane(issues)

@@ -86,15 +86,15 @@ Not Assessed.
    secrets or sensitive PII; report path, finding type, and a safe redacted
    fingerprint.
 
-6. **Use the right report depth.**
+6. **Choose report depth.**
    - **Compact:** evidence boundary, safety findings, concise verdict, and top
      fixes.
-   - **Standard:** Compact plus structure, behavioral review, pressure tests,
-     simulations, severity-ranked fixes, and `/100` scorecard.
+   - **Standard:** decision, top findings, score scope, coverage, and next actions
+     first; attach complete inspection, pressure, simulation, and score records once.
    - **Release:** Standard plus release evidence and the complete authoritative
      G01–G23 matrix. Its five-row executive summary never replaces the matrix.
 
-   Report mode changes presentation only; safety checks and evidence boundaries
+   Report mode changes presentation only; safety and evidence boundaries
    stay mandatory.
 
 ## Skill Forge Self-Audit Bootstrap
@@ -102,17 +102,12 @@ Not Assessed.
 When the selected artifact is Skill Forge itself, statically review bundled
 inspection, test, packaging, and imported safety-critical scripts before
 executing any of them. Classify this checkout's inspector and tests only as
-**package self-test evidence**. They may demonstrate behavior but cannot
+**package self-test evidence**. They demonstrate behavior but cannot
 independently validate this artifact or establish release validity. Independent
 strict evidence requires a separately installed trusted Skill Forge release, a
-previously verified archive, or another independent evaluator. Record the
-source and limitation; never upgrade this target's own passing tests to an
+previously verified archive, or another independent evaluator. Record
+provenance; never upgrade this target's own passing tests to an
 independent release pass.
-
-The only schema-bootstrap exception is the explicit schema 5 to 6 transition
-for `v2.0.0` defined by `independent_evaluator_policy.bootstrap_transition`.
-Label it bootstrap transition evidence, never an independent schema-6 pass,
-and do not reuse it after that release.
 
 ## Resource Routing
 
@@ -123,8 +118,10 @@ Load only when needed: `references/input-routing.md` and
 installed runtimes, portfolios, or releases;
 `references/inspector-output-schema.md` for inspector output;
 `references/validator-evidence.md` for validator/self-test provenance;
+`references/bounded-tests.md` for reviewed self-test execution;
 `references/pressure-test-suite.md`, `references/severity-framework.md`, and
 `references/evaluation-rubric.md` for Standard behavior, severity, and scoring;
+`references/scoring-contract.json` and `references/scorecard-schema.md` for anchors;
 `references/report-template.md` for Standard structure; and
 `references/platform-compatibility.md` for target questions. Standard does not
 require the full Release contract; source contract validation keeps mirrored
@@ -134,7 +131,9 @@ rules synchronized.
 
 Release loads `references/audit-contract.json`,
 `references/release-gate-checklist.md`, and
-`references/runtime-manifest-schema.md`.
+`references/runtime-manifest-schema.md`, `references/release-report-template.md`,
+and `references/release-evaluator-provenance.md`. Historical bootstrap details
+load only for that Release evidence task.
 
 ### Human-only references
 
@@ -144,11 +143,11 @@ Release loads `references/audit-contract.json`,
 ### Script roles
 
 Agent-invoked runtime tools: `scripts/inspect_skill_package.py`,
-`scripts/package_skill.py`, `scripts/run_self_tests.py`, and
+`scripts/package_skill.py`, `scripts/run_self_tests.py`, `scripts/run_bounded_tests.py`, `scripts/score_audit.py`, and
 `scripts/validate_audit_contract.py`. Imported runtime modules:
 `scripts/portable_zip_paths.py` and `scripts/runtime_manifest.py`. Source-only
 maintenance is declared below.
 <!-- skill-forge:source-only scripts/generate_release_notes.py scripts/release_metadata.py scripts/release_skill.py scripts/run_source_tests.py scripts/verify_independent_evaluator.py -->
 
-Maintenance runs contract and source tests. Authorized Release work builds from
+Maintenance runs tests. Authorized Release work builds from
 a commit, source-proves and extracts the archive, then runs packaged tests.

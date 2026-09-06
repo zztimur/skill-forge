@@ -44,6 +44,8 @@ SKILL_FORGE_RUNTIME_SCRIPT_PATHS = (
     "scripts/package_skill.py",
     "scripts/portable_zip_paths.py",
     "scripts/run_self_tests.py",
+    "scripts/run_bounded_tests.py",
+    "scripts/score_audit.py",
     "scripts/runtime_manifest.py",
     "scripts/validate_audit_contract.py",
 )

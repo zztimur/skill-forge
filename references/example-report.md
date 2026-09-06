@@ -1,17 +1,32 @@
 # Example Skill Evaluation Report
 
+> Synthetic example: rubric 2.0 design assessment; static evidence does not establish artifact eligibility.
+
 Use this as a tone and depth guide when the user asks for a polished, executive-ready audit. Its structure follows [`report-template.md`](report-template.md); the template and [`audit-contract.json`](audit-contract.json) win if they ever differ.
 
 ---
 
 # Skill Evaluation Report
 
+## Decision
+
+**Quality verdict:** 66.0/100 for the synthetic design assessment; release fails.
+**Top findings:** input/output scope is unspecified, one script is orphaned,
+and required pressure scenarios reveal failures. No bundled secret was observed;
+the inferred privacy-control gap remains a finding.
+**Score scope:** Complete package, design evidence only. **Evidence coverage:**
+100/100 applicable weight; no runtime or host triggering was observed.
+**Next actions:** specify invoice formats and output fields, document the script,
+and define error/privacy handling; repeat the cited pressure tests afterward.
+Full evidence and the Release extension follow. This is an illustrative Release
+report; ordinary Standard output uses the shorter template and evidence attachments.
+
 ## 0. Request and Evidence Boundary
 
 - **Requested mode:** Release gate
 - **Selected artifact and reason:** `invoice-parser.zip`, the only supplied package
 - **Artifact role:** Release ZIP
-- **New-release eligibility:** eligible exact artifact — the supplied Release ZIP is the artifact being judged
+- **New-release eligibility:** Not Assessed — the exact artifact is identified, but this design assessment cannot establish release eligibility
 - **Required artifact-role evidence:** exact Release ZIP inspection is satisfied; no packaging from an installed runtime or mutable source is claimed
 - **Artifact coverage:** Complete package
 - **Source of truth and write boundary:** The supplied ZIP is read-only evidence; no mutable source checkout was supplied
@@ -38,11 +53,11 @@ Use this as a tone and depth guide when the user asks for a polished, executive-
 - **Package self-tests:** Not Applicable — the package supplied no approved self-test plan
 - **Placeholder/example files found:** none
 - **Potential safety/privacy concerns:** Inferred privacy-control gap: the workflow does not say to minimize or redact payment data. No bundled secret or destructive-script finding was observed. `secret scanning is heuristic and non-exhaustive; it scans known text/config formats and regular files that pass bounded content sniffing. Eligible files are read completely within package safety limits unless --max-safety-scan-bytes explicitly requests exploratory partial scanning.`
-- **Relevant inspector finding codes:** `frontmatter_description_short`
+- **Relevant inspector finding codes:** none; semantic description review only
 
 ## 2. Executive Summary
 
-The Skill has a useful purpose and a sensible structure, but it is **not release-ready**. Its strongest design point is a clean, minimal layout with a focused reference file. Its biggest risk is triggering: the description is too short to reliably invoke the Skill, and error handling for messy real-world invoices is underspecified.
+The Skill has a useful purpose and a sensible structure, but it is **not release-ready**. Its strongest design point is a clean, minimal layout with a focused reference file. Its biggest risk is triggering: the description omits supported inputs and expected outputs, and error handling for messy real-world invoices is underspecified.
 
 ## 3. Release Gate Review
 
@@ -50,7 +65,7 @@ The Skill has a useful purpose and a sensible structure, but it is **not release
 
 | Group | Gates | Result | Concise evidence / blocker |
 |---|---|---|---|
-| Structure and metadata | G01–G08 | Fail | G05 fails: description is too thin; target-specific gates are Not Applicable with Portable rationales. |
+| Structure and metadata | G01–G08 | Fail | G05 fails: description omits input/output scope; target-specific gates are Not Applicable with Portable rationales. |
 | Validation evidence | G09–G12 | Pass | Strict helper evidence passes; G10–G12 are Not Applicable for documented scope reasons. |
 | Package safety and content | G13–G19 | Fail | G14 fails because the bundled script is orphaned; G19 is Not Applicable because Portable has no documented upload limit. |
 | Pressure tests and remediation | G20–G21 | Fail | Required scenarios reveal failures, but severity-ranked fixes are complete. |
@@ -64,7 +79,7 @@ The Skill has a useful purpose and a sensible structure, but it is **not release
 | G02 | Selected-target required frontmatter fields | Pass | **Verified:** `target_contracts.portable` requires `name` and `description`; parser accepts both. |
 | G03 | Selected-profile package root shape | Pass | **Verified:** wrapped ZIP root is structurally valid for Portable review. |
 | G04 | Selected-target name rule when required or supplied | Pass | **Verified:** the Portable lower-hyphen policy name matches the directory. |
-| G05 | Trigger-rich description | Fail | **Verified:** 22-character description and `frontmatter_description_short`; it lacks input and outcome triggers. |
+| G05 | Trigger-rich description | Fail | **Verified:** the description says "parse invoices" and omits supported input types and output fields. |
 | G06 | Documented description or listing limit | Not Applicable | `target_contracts.portable` has no documented host description limit; the configured inspector boundary is not a host claim. |
 | G07 | Conditional OpenAI UI metadata | Not Applicable | Portable review does not claim an OpenAI UI workflow. |
 | G08 | Valid platform-specific frontmatter | Not Applicable | No selected host-specific fields require validation under Portable. |
@@ -81,7 +96,7 @@ The Skill has a useful purpose and a sensible structure, but it is **not release
 | G19 | Known target product upload limit or N/A rationale | Not Applicable | `target_contracts.portable` has no host upload limit; the inspector's configured pre-open boundary is safety evidence only. |
 | G20 | Pressure coverage and behavioral results | Fail | **Inferred:** all categories are reported in §7; wrong-input and safety/privacy scenarios fail. G20 measures both coverage and behavioral success. |
 | G21 | Severity-ranked fixes documented | Pass | **Verified:** §9 records evidence, severity, fixes, and re-tests. |
-| G22 | Counts, scorecard, caps, severity list, and verdict reconcile | Pass | **Verified:** counts below, 74/100 score, 79/100 cap, High issue, and Fail verdict agree. |
+| G22 | Counts, scorecard, caps, severity list, and verdict reconcile | Pass | **Verified:** counts below, 66.0/100 design quality and legacy projection, 79/100 legacy cap, High issue, and Fail verdict agree. |
 | G23 | Skill Forge runtime archive package verification | Not Applicable | The reviewed artifact is `invoice-parser.zip`, not a Skill Forge release candidate. |
 
 **Required-gate counts:** Pass: 12; Fail: 3; Partial: 0; Not Assessed: 0; Not Applicable: 8; Applicable: 15.
@@ -94,7 +109,7 @@ verdict.
 
 ## 4. Triggering and Discoverability Review
 
-The description says only "parse invoices," which is too short and misses the concrete inputs and outputs a host model routes on. Likely false negatives: "extract totals from this receipt," "read the fields off this uploaded PDF," and "summarize this invoice." Likely false positives are low. It should name uploaded PDFs/images, field extraction, validation, and structured output.
+The description says only "parse invoices," which omits the concrete input formats and output fields needed to assess scope. Likely false negatives: "extract totals from this receipt," "read the fields off this uploaded PDF," and "summarize this invoice." Likely false positives are low. It should name uploaded PDFs/images, field extraction, validation, and structured output.
 
 Suggested replacement description:
 
@@ -175,7 +190,7 @@ None.
 
 ### High
 
-- **Evidence status:** Verified. **Evidence:** `SKILL.md` frontmatter; inspector finding `frontmatter_description_short`. **File/section:** `SKILL.md` frontmatter. **Problem:** description lacks trigger terms and expected inputs. **Why it matters:** the Skill will not reliably activate. **Recommended fix:** adopt the trigger-rich description in §4. **Re-test:** rerun the inspector and the happy-path triggering simulation.
+- **Evidence status:** Verified. **Evidence:** `SKILL.md` frontmatter; quoted description "parse invoices". **File/section:** `SKILL.md` frontmatter. **Problem:** description lacks trigger terms and expected inputs. **Why it matters:** routing behavior is uncertain without live observation. **Recommended fix:** adopt the trigger-rich description in §4. **Re-test:** inspect semantic scope and observe host triggering when available.
 
 ### Medium
 
@@ -195,23 +210,449 @@ None.
 
 **Score scope:** Complete package
 
-| Category | Maximum | Score | Evidence |
-|---|---:|---:|---|
-| Triggering and description quality | 20 | 12 | Verified short, weak description |
-| Workflow clarity and instruction quality | 20 | 16 | Inferred gaps in fallback behavior |
-| Reliability under pressure tests | 20 | 14 | Inferred static records have Fail and Partial results; script execution is Not Assessed |
-| Use of scripts/references/assets | 15 | 11 | Useful reference; undocumented script |
-| Error handling and edge cases | 10 | 8 | Inferred missing paths for common cases |
-| Safety, privacy, and security | 10 | 8 | Inferred missing payment-data handling |
-| Maintainability and polish | 5 | 5 | Compact, clear layout |
-| **Total** | **100** | **74** | Reconciled |
+**Scorecard version:** 1.0; **Rubric version:** 2.0; **Assessment profile:** design
 
-**Score cap applied:** 79/100 — unresolved High issue and failed required pressure evidence both cap the result. The 49/100 unresolved-Critical cap does not apply because there is no Critical issue.
+**Score cap applied:** 79/100 — legacy projection only; unresolved High and failed pressure evidence. Quality is independent of the cap.
 
-**Score:** 74/100
-**Rating:** 7/10 — solid concept, not release-ready
+**Quality score:** 66.0/100
+**Assessed-only score:** 66.0/100
+**Evidence coverage:** 1.0 (100/100 applicable weight)
+**Legacy policy score:** 66.0/100
+**Rating:** Rubric 2.0 design quality — complete declared evidence
 
-**Quality verdict:** The Skill is promising and structurally sound, but weak triggering, thin edge-case handling, PII gaps, and an undocumented script contract keep it below its 79/100 High-issue cap.
+The following machine-validated scorecard declares synthetic evidence; the calculator does not prove the truth of these observations.
+
+```json scorecard
+{
+  "schema_version": 1,
+  "scorecard_version": "1.0",
+  "rubric_version": "2.0",
+  "assessment_profile": "design",
+  "target": {
+    "artifact": "invoice-parser.zip",
+    "host": null,
+    "host_version": null
+  },
+  "evidence": [
+    {
+      "id": "E1",
+      "method": "Static inspection",
+      "status": "Verified",
+      "source": "SKILL.md and package inventory",
+      "observation": "Synthetic file inspection: weak description and undocumented script."
+    },
+    {
+      "id": "E2",
+      "method": "Static simulation",
+      "status": "Inferred",
+      "source": "Pressure-test records",
+      "observation": "Synthetic reasoning predicts workflow and privacy gaps."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F01",
+      "defect_id": "D01",
+      "primary_criterion_id": "C01",
+      "evidence_ids": [
+        "E2"
+      ],
+      "impact": "Relevant requests select the skill but one adjacent boundary produces a false positive.",
+      "severity": "Medium",
+      "resolved": false
+    },
+    {
+      "id": "F02",
+      "defect_id": "D02",
+      "primary_criterion_id": "C02",
+      "evidence_ids": [
+        "E1"
+      ],
+      "impact": "Task and inputs are named but one boundary exists only in the body.",
+      "severity": "High",
+      "resolved": false
+    },
+    {
+      "id": "F04",
+      "defect_id": "D04",
+      "primary_criterion_id": "C04",
+      "evidence_ids": [
+        "E2"
+      ],
+      "impact": "Core output is produced but a nonessential step requires interpretation.",
+      "severity": "Medium",
+      "resolved": false
+    },
+    {
+      "id": "F06",
+      "defect_id": "D06",
+      "primary_criterion_id": "C06",
+      "evidence_ids": [
+        "E2"
+      ],
+      "impact": "Cases complete safely but at least one yields a usable incomplete result.",
+      "severity": "Medium",
+      "resolved": false
+    },
+    {
+      "id": "F07",
+      "defect_id": "D07",
+      "primary_criterion_id": "C07",
+      "evidence_ids": [
+        "E1"
+      ],
+      "impact": "Core resources are usable but one optional resource is unlinked or undocumented.",
+      "severity": "Medium",
+      "resolved": false
+    },
+    {
+      "id": "F09",
+      "defect_id": "D09",
+      "primary_criterion_id": "C09",
+      "evidence_ids": [
+        "E2"
+      ],
+      "impact": "Input is rejected safely but recovery guidance omits one necessary detail.",
+      "severity": "Medium",
+      "resolved": false
+    },
+    {
+      "id": "F10",
+      "defect_id": "D10",
+      "primary_criterion_id": "C10",
+      "evidence_ids": [
+        "E2"
+      ],
+      "impact": "Execution stops safely but diagnosis or next step is incomplete.",
+      "severity": "Medium",
+      "resolved": false
+    },
+    {
+      "id": "F11",
+      "defect_id": "D11",
+      "primary_criterion_id": "C11",
+      "evidence_ids": [
+        "E1"
+      ],
+      "impact": "No secrets are present and core boundaries exist but a noncritical retention detail is unclear.",
+      "severity": "Medium",
+      "resolved": false
+    },
+    {
+      "id": "F12",
+      "defect_id": "D12",
+      "primary_criterion_id": "C12",
+      "evidence_ids": [
+        "E2"
+      ],
+      "impact": "Boundaries hold but safe refusal or redaction communication is incomplete.",
+      "severity": "Medium",
+      "resolved": false
+    }
+  ],
+  "criteria": [
+    {
+      "criterion_id": "C01",
+      "outcome": "Partial",
+      "evidence_ids": [
+        "E2"
+      ],
+      "finding_ids": [
+        "F01"
+      ],
+      "rationale": "Relevant requests select the skill but one adjacent boundary produces a false positive.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C02",
+      "outcome": "Partial",
+      "evidence_ids": [
+        "E1"
+      ],
+      "finding_ids": [
+        "F02"
+      ],
+      "rationale": "Task and inputs are named but one boundary exists only in the body.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C03",
+      "outcome": "Pass",
+      "evidence_ids": [
+        "E1"
+      ],
+      "finding_ids": [],
+      "rationale": "Steps define inputs, outputs, decisions and completion checks.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C04",
+      "outcome": "Partial",
+      "evidence_ids": [
+        "E2"
+      ],
+      "finding_ids": [
+        "F04"
+      ],
+      "rationale": "Core output is produced but a nonessential step requires interpretation.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C05",
+      "outcome": "Pass",
+      "evidence_ids": [
+        "E2"
+      ],
+      "finding_ids": [],
+      "rationale": "Happy path and minimal input meet declared expectations.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C06",
+      "outcome": "Partial",
+      "evidence_ids": [
+        "E2"
+      ],
+      "finding_ids": [
+        "F06"
+      ],
+      "rationale": "Cases complete safely but at least one yields a usable incomplete result.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C07",
+      "outcome": "Partial",
+      "evidence_ids": [
+        "E1"
+      ],
+      "finding_ids": [
+        "F07"
+      ],
+      "rationale": "Core resources are usable but one optional resource is unlinked or undocumented.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C08",
+      "outcome": "Pass",
+      "evidence_ids": [
+        "E1"
+      ],
+      "finding_ids": [],
+      "rationale": "Resources are proportionate, focused and necessary; correctly needing no scripts or assets earns full credit.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C09",
+      "outcome": "Partial",
+      "evidence_ids": [
+        "E2"
+      ],
+      "finding_ids": [
+        "F09"
+      ],
+      "rationale": "Input is rejected safely but recovery guidance omits one necessary detail.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C10",
+      "outcome": "Partial",
+      "evidence_ids": [
+        "E2"
+      ],
+      "finding_ids": [
+        "F10"
+      ],
+      "rationale": "Execution stops safely but diagnosis or next step is incomplete.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C11",
+      "outcome": "Partial",
+      "evidence_ids": [
+        "E1"
+      ],
+      "finding_ids": [
+        "F11"
+      ],
+      "rationale": "No secrets are present and core boundaries exist but a noncritical retention detail is unclear.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C12",
+      "outcome": "Partial",
+      "evidence_ids": [
+        "E2"
+      ],
+      "finding_ids": [
+        "F12"
+      ],
+      "rationale": "Boundaries hold but safe refusal or redaction communication is incomplete.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C13",
+      "outcome": "Pass",
+      "evidence_ids": [
+        "E1"
+      ],
+      "finding_ids": [],
+      "rationale": "Structure and naming are consistent and content has one clear source of truth.",
+      "na_reason": null,
+      "additional_impacts": []
+    },
+    {
+      "criterion_id": "C14",
+      "outcome": "Pass",
+      "evidence_ids": [
+        "E1"
+      ],
+      "finding_ids": [],
+      "rationale": "Wording and examples are accurate, concise and free of leftovers.",
+      "na_reason": null,
+      "additional_impacts": []
+    }
+  ],
+  "release": {
+    "artifact_eligible": false,
+    "required_gates": [
+      {
+        "id": "G01",
+        "result": "Pass",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G02",
+        "result": "Pass",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G03",
+        "result": "Pass",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G04",
+        "result": "Pass",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G05",
+        "result": "Fail",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G06",
+        "result": "Not Applicable",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G07",
+        "result": "Not Applicable",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G08",
+        "result": "Not Applicable",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G09",
+        "result": "Pass",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G10",
+        "result": "Not Applicable",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G11",
+        "result": "Not Applicable",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G12",
+        "result": "Not Applicable",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G13",
+        "result": "Pass",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G14",
+        "result": "Fail",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G15",
+        "result": "Pass",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G16",
+        "result": "Pass",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G17",
+        "result": "Pass",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G18",
+        "result": "Pass",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G19",
+        "result": "Not Applicable",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G20",
+        "result": "Fail",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G21",
+        "result": "Pass",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G22",
+        "result": "Pass",
+        "rationale": "See corresponding detailed release matrix row."
+      },
+      {
+        "id": "G23",
+        "result": "Not Applicable",
+        "rationale": "See corresponding detailed release matrix row."
+      }
+    ]
+  },
+  "legacy_projection": {
+    "enabled": true,
+    "cap_reasons": [
+      "unresolved_high",
+      "missing_or_failed_required_pressure_evidence"
+    ]
+  }
+}
+```
 
 **Release verdict:** Fail — this matches §3: the trigger, orphaned-resource, and pressure-test gates fail, and the High trigger issue remains unresolved.
 
@@ -223,3 +664,5 @@ None.
 ## 11. Recommended Next Version
 
 Ship a stronger description, defined error handling, a documented script contract, and a PII-handling rule; then retest with messy real-world invoices and re-run the pressure-test categories that failed or were partial. Recalculate the scorecard and release gate only after those results are available.
+
+Legacy projection caps: 49/100 for unresolved Critical; 79/100 for unresolved High or missing/failed required pressure evidence. These never cap quality.

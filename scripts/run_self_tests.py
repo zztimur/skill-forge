@@ -41,7 +41,7 @@ FAKE_FRONTMATTER_PII = "fixture.user" + "@example.invalid"
 FAKE_FRONTMATTER_PRIVATE_VALUE = "private-customer-record-" + "R" * 16
 PATHOLOGICAL_YAML_INTEGER = "9" * 5000
 EXPECTED_SYNTHETIC_RUNTIME_ZIP_SHA256 = (
-    "6f58a416a23d0dee5fe6e0a818febd49e57d39c043a7cc6f433e4f2b1ff28831"
+    "d73aa356525b4230c712ea6456b8886ed2edca812ebc8688d83d676423cc8d65"  # privacy-gate: allow - synthetic archive digest
 )
 
 FINDING_SECTION_KEYS = (
@@ -92,6 +92,8 @@ def minimal_runtime_manifest_files() -> dict[str, bytes]:
         "scripts/package_skill.py": b"# package fixture\n",
         "scripts/portable_zip_paths.py": b"# paths fixture\n",
         "scripts/run_self_tests.py": b"# tests fixture\n",
+        "scripts/score_audit.py": b"# calculator fixture\n",
+        "scripts/run_bounded_tests.py": b"# bounded runner fixture\n",
         "scripts/runtime_manifest.py": b"# manifest fixture\n",
         "scripts/validate_audit_contract.py": b"# contract fixture\n",
     }
@@ -262,6 +264,8 @@ def build_release_package_fixture(tmp: Path, repo_only_member: Optional[str] = N
         ZIP_PATH_POLICY,
         RUNTIME_MANIFEST,
         CONTRACT_VALIDATOR,
+        SCRIPT.with_name("score_audit.py"),
+        SCRIPT.with_name("run_bounded_tests.py"),
         Path(__file__),
     ):
         (scripts / source.name).write_bytes(source.read_bytes())
@@ -315,6 +319,8 @@ def build_committed_release_package_fixture(
         ZIP_PATH_POLICY,
         RUNTIME_MANIFEST,
         CONTRACT_VALIDATOR,
+        SCRIPT.with_name("score_audit.py"),
+        SCRIPT.with_name("run_bounded_tests.py"),
         Path(__file__),
     ):
         (scripts / source.name).write_bytes(source.read_bytes())
@@ -3662,6 +3668,49 @@ def run_seeded_gate_matrix_fuzz_case() -> dict[str, Any]:
     }
 
 
+def run_scoring_contract_regression_case() -> dict[str, Any]:
+    """Reject malformed anchors, weights, profiles, and weakened scoring policy."""
+    failures = []
+    try:
+        validator = load_module(CONTRACT_VALIDATOR, "scoring_contract_tests")
+        contract = validator.load_contract_json((CONTRACT_VALIDATOR.parent.parent / "references/scoring-contract.json").read_text())
+        issues = []
+        validator.validate_scoring_contract(contract, issues)
+        if issues:
+            failures.append("valid contract: " + repr(issues))
+        mutations = [
+            ("version", lambda c: c.update(schema_version=True)),
+            ("rubric version", lambda c: c.update(rubric_version="3.0")),
+            ("boolean fraction", lambda c: c["earned_fractions"].update(Pass=True)),
+            ("empty criteria", lambda c: c.update(criteria=[])),
+            ("missing criterion", lambda c: c["criteria"].pop()),
+            ("missing methods", lambda c: c["criteria"][0].update(required_methods={})),
+            ("unknown criterion field", lambda c: c["criteria"][0].update(extra=True)),
+            ("fraction", lambda c: c["earned_fractions"].update(Partial=0.75)),
+            ("duplicate", lambda c: c["criteria"][1].update(id=c["criteria"][0]["id"])),
+            ("weight", lambda c: c["criteria"][0].update(weight=True)),
+            ("total", lambda c: c["criteria"][0].update(weight=500)),
+            ("anchor", lambda c: c["criteria"][0]["anchors"].update(Partial=" ")),
+            ("same anchor", lambda c: c["criteria"][0]["anchors"].update(Partial=c["criteria"][0]["anchors"]["Pass"])),
+            ("profile", lambda c: c["profiles"].pop("host")),
+            ("host method", lambda c: c["criteria"][0]["required_methods"].update(host=["Static simulation"])),
+            ("execution method", lambda c: c["criteria"][0]["required_methods"].update(execution=["Static inspection"])),
+            ("na", lambda c: c["criteria"][0].update(not_applicable_reasons=[""])),
+            ("dedup", lambda c: c["deduction_policy"].update(primary_criterion_per_defect=False)),
+            ("unknown", lambda c: c.update(unknown_policy=True)),
+        ]
+        for name, mutate in mutations:
+            candidate = json.loads(json.dumps(contract))
+            mutate(candidate)
+            errors = []
+            validator.validate_scoring_contract(candidate, errors)
+            if not errors:
+                failures.append("accepted " + name)
+    except Exception as exc:
+        failures.append(str(exc))
+    return {"name": "anchored scoring contract rejects invalid mutations", "fixture": "scoring-contract.json", "expected_exit": 0, "actual_exit": int(bool(failures)), "expected_code": "scoring contract", "result": "FAIL" if failures else "PASS", "reason": "; ".join(failures)}
+
+
 def run_audit_contract_validation_case() -> dict[str, Any]:
     """Ensure the documentation contract itself remains machine-valid."""
     command = [sys.executable, "-S", str(CONTRACT_VALIDATOR), "--json"]
@@ -4341,6 +4390,101 @@ def run_resource_graph_case() -> dict[str, Any]:
             "result": "FAIL" if failures else "PASS", "reason": "; ".join(failures)}
 
 
+def run_scorecard_case() -> dict:
+    try:
+        module = load_module(Path(__file__).with_name("score_audit.py"), "scorecard_tests")
+        contract = json.loads((SCRIPT.parent.parent / "references/scoring-contract.json").read_text())
+        card = module.example_scorecard(contract)
+        assert module.score_audit(card, contract)["quality_score"] == 100
+        import copy
+        unknown = copy.deepcopy(card)
+        for row in unknown["criteria"]:
+            row.update(outcome="Not Assessed", evidence_ids=[])
+        assert module.score_audit(unknown, contract)["quality_score"] is None
+        for key, value in [("schema_version", True), ("quality_score", 99), ("artifact", "bad")]:
+            bad = copy.deepcopy(card)
+            bad[key] = value
+            try:
+                module.score_audit(bad, contract)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("invalid scorecard accepted")
+        def rejects(bad, selected=contract):
+            try:
+                module.score_audit(bad, selected)
+            except (ValueError, TypeError):
+                return
+            raise AssertionError("invalid adversarial scorecard accepted")
+        public = copy.deepcopy(card)
+        public["evidence"][0]["source"] = "https://example.org/docs"
+        public["evidence"][0]["observation"] = "The documented bound is 2 < 3."
+        assert module.score_audit(public, contract)["quality_score"] == 100
+        bad = copy.deepcopy(card); bad["target"]["artifact"] = "ID " + "123" + "-45-6789"; rejects(bad)
+        for scalar in (False, None, [], {}):
+            bad = copy.deepcopy(card); bad["assessment_profile"] = scalar; rejects(bad)
+        na = copy.deepcopy(card)
+        na["criteria"][9].update(outcome="Not Applicable", evidence_ids=[], na_reason=contract["criteria"][9]["not_applicable_reasons"][0])
+        assert module.score_audit(na, contract)["applicable_weight"] == 95
+        assert module.score_audit(na, contract)["quality_score"] == 100
+        bad = copy.deepcopy(card); bad["criteria"][0]["evidence_ids"] = []; rejects(bad)
+        bad = copy.deepcopy(card); bad["criteria"][0]["outcome"] = "Partial"; rejects(bad)
+        bad = copy.deepcopy(card); bad["criteria"][1] = bad["criteria"][0]; rejects(bad)
+        bad = copy.deepcopy(card); bad["criteria"][0]["na_reason"] = "invented"; rejects(bad)
+        bad = copy.deepcopy(card); bad["target"]["artifact"] = "unsafe" + chr(27); rejects(bad)
+        bad = copy.deepcopy(card); bad["evidence"][0]["method"] = "invented"; rejects(bad)
+        bad = copy.deepcopy(card); bad["release"]["artifact_eligible"] = True; rejects(bad)
+        bad_contract = copy.deepcopy(contract); bad_contract["criteria"][0]["weight"] = True; rejects(card, bad_contract)
+        execution = copy.deepcopy(card)
+        execution["assessment_profile"] = "execution"
+        execution["evidence"][0]["method"] = "Synthetic execution"
+        execution["release"] = dict(artifact_eligible=True, required_gates=[dict(id="G%02d" % n, result="Pass", rationale="Synthetic gate evidence") for n in range(1, 24)])
+        execution["legacy_projection"]["cap_reasons"] = []
+        assert module.score_audit(execution, contract)["release_verdict"] == "Pass"
+        unsafe = copy.deepcopy(execution)
+        unsafe["criteria"][11].update(outcome="Fail", finding_ids=["F1"])
+        unsafe["findings"] = [dict(id="F1", defect_id="D1", primary_criterion_id="C12", evidence_ids=["E1"], impact="Unsafe boundary crossing", severity="Critical", resolved=False)]
+        unsafe["legacy_projection"].update(enabled=True, cap_reasons=["unresolved_critical"])
+        computed = module.score_audit(unsafe, contract)
+        assert computed["quality_score"] == 95 and computed["release_verdict"] == "Fail" and computed["legacy_policy_score"] == 49
+        distinct = copy.deepcopy(unsafe)
+        distinct["criteria"][10].update(outcome="Partial", finding_ids=["F1"], additional_impacts=[dict(finding_id="F1", impact="Documentation omits the authority boundary", evidence_ids=["E1"])])
+        assert module.score_audit(distinct, contract)["quality_score"] == 92.5
+        repeated = copy.deepcopy(distinct)
+        repeated["criteria"][10]["additional_impacts"][0]["impact"] = " Unsafe   boundary CROSSING "
+        rejects(repeated)
+        distinct["criteria"][10]["additional_impacts"] = []
+        rejects(distinct)
+        bad = copy.deepcopy(execution)
+        bad["evidence"][0]["status"] = "Unverified"
+        bad["evidence"].append(dict(id="E2", method="Static inspection", status="Verified", source="SKILL.md", observation="File fact"))
+        for row in bad["criteria"]: row["evidence_ids"] = ["E1", "E2"]
+        rejects(bad)
+        bad = copy.deepcopy(execution); bad["release"]["required_gates"].pop(); rejects(bad)
+        partial = copy.deepcopy(execution); partial["release"]["required_gates"][19]["result"] = "Partial"
+        assert module.score_audit(partial, contract)["release_verdict"] == "Partial"
+        assert module.presented(module.Fraction(1, 20)) == 0.1
+        with tempfile.TemporaryDirectory(prefix="scorecard_runtime_") as temp:
+            extracted = Path(temp)
+            (extracted / "scripts").mkdir(); (extracted / "references").mkdir()
+            for name in ("score_audit.py", "validate_audit_contract.py", "inspect_skill_package.py", "portable_zip_paths.py", "package_skill.py", "runtime_manifest.py"):
+                (extracted / "scripts" / name).write_bytes(SCRIPT.with_name(name).read_bytes())
+            (extracted / "references/scoring-contract.json").write_text(json.dumps(contract))
+            input_path = extracted / "scorecard.json"
+            input_path.write_text(json.dumps(unsafe))
+            command = [sys.executable, "-B", "-S", str(extracted / "scripts/score_audit.py"), str(input_path), "--json"]
+            cli = subprocess.run(command, capture_output=True, text=True)
+            assert cli.returncode == 0 and json.loads(cli.stdout)["release_verdict"] == "Fail", (cli.returncode, cli.stdout, cli.stderr)
+            input_path.write_text('{"schema_version":1,"schema_version":1}')
+            cli = subprocess.run(command, capture_output=True, text=True)
+            assert cli.returncode == 2 and "error" in json.loads(cli.stdout)
+        result, reason = "PASS", "versioned calculation and invalid input rejection"
+    except Exception as exc:
+        result, reason = "FAIL", str(exc)
+    return dict(name="scorecard calculator", expected_exit=0, actual_exit=0 if result == "PASS" else 1,
+                expected_code="", result=result, reason=reason)
+
+
 def main() -> int:
     cases = [
         TestCase("canonical missing dependency exits 2", lambda tmp: build_resource_path_fixture(tmp, "", False), 2, "missing_resource_reference"),
@@ -4548,6 +4692,7 @@ def main() -> int:
     results.append(run_resource_graph_case())
     results.append(run_public_output_privacy_case())
     print("Running audit and release-report contract validation...", file=sys.stderr, flush=True)
+    results.append(run_scoring_contract_regression_case())
     results.append(run_audit_contract_validation_case())
 
     print("Running audit report consistency drift checks...", file=sys.stderr, flush=True)
@@ -4636,6 +4781,8 @@ def main() -> int:
 
     print("Running seeded report/gate matrix fuzz...", file=sys.stderr, flush=True)
     results.append(run_seeded_gate_matrix_fuzz_case())
+
+    results.append(run_scorecard_case())
 
     headers = ["Test", "Expected", "Actual", "Finding", "Result", "Reason"]
     rows = [[

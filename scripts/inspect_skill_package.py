@@ -1194,12 +1194,8 @@ def validate_frontmatter(frontmatter: Dict[str, Any], target: str = "portable") 
         desc = description.strip()
         if re.search(r"</?[A-Za-z][^>]*>", desc):
             findings.append(finding("error", "frontmatter_description_angle_brackets", "frontmatter description should not contain XML/HTML tags"))
-        if len(desc) < 80:
-            findings.append(finding("warning", "frontmatter_description_short", "frontmatter description may be too short to trigger reliably", length=len(desc)))
-        lower_desc = desc.lower()
-        trigger_terms = ["use", "when", "uploaded", "skill", "review", "evaluate", "audit", "validate"]
-        if not any(term in lower_desc for term in trigger_terms):
-            findings.append(finding("warning", "frontmatter_description_weak_trigger", "description may not clearly explain when to use the skill"))
+        # Length and English keywords cannot establish semantic trigger quality.
+        # Keep objective validity checks here; qualitative evidence belongs in review.
     return findings
 
 

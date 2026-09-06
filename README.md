@@ -236,7 +236,7 @@ author identity, release authorization, or remote-origin authenticity.
 
 ## Release-gate workflow
 
-For install, publish, ship, or release-candidate decisions, use `references/audit-contract.json`, `references/release-gate-checklist.md`, and the Release Gate Review section from `references/report-template.md`. The complete G01–G23 gate matrix is the proof; the five-row executive summary cannot replace it.
+For install, publish, ship, or release-candidate decisions, use `references/audit-contract.json`, `references/release-gate-checklist.md`, and `references/release-report-template.md`. The complete G01–G23 gate matrix is the proof; the five-row executive summary cannot replace it.
 
 A skill is release-ready only when every applicable required gate passes; a Critical gate failure is always disqualifying.
 

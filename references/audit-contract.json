@@ -1,5 +1,5 @@
 {
-  "contract_version": 4,
+  "contract_version": 5,
   "result_enums": [
     "Pass",
     "Fail",
@@ -1154,5 +1154,11 @@
       ],
       "blocks_release": true
     }
-  ]
+  ],
+  "scoring_contract": {
+    "path": "scoring-contract.json",
+    "schema_version": 1,
+    "score_caps_scope": "legacy_policy_score_only",
+    "quality_independent_of_release": true
+  }
 }

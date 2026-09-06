@@ -8,17 +8,39 @@ top until the local release command promotes them into a versioned entry.
 
 ### Added
 
+- Added rubric 2.0 with fourteen anchored criteria and a versioned scorecard
+  calculator. Quality, evidence coverage, optional legacy score caps, and release
+  verdicts are reported separately; historical scores retain their rubric version.
+- Added source-only synthetic agent evaluation fixtures and trace checks. Live
+  grading consistency and human calibration are not claimed by these fixtures.
+- Added a capability-checked self-test launcher with a pinned Linux Docker image,
+  bounded copied inputs and output, resource probes, and fail-closed unsupported
+  host behavior. macOS target execution remains unavailable.
+
 - Added a security policy, contribution guide, and structured issue forms for
   bugs, false positives, new checks, compatibility requests, and safe security
   contact requests.
 
 ### Changed
 
+- Standard audits lead with the decision and findings; the complete release gate
+  matrix and historical evaluator bootstrap guidance load only for release work.
+- Description quality no longer receives automatic short-text or English-keyword
+  penalties. Required fields and objective target limits remain enforced.
+
 - Rebuilt the README front door with a faster quick start, Agent Skill
   installation guidance, an example release verdict, and a concise comparison
   with basic package linting.
 - Promoted the tested `npx skills` installation path, added the `skills.sh`
   badge, and retained checksum-verified release installation instructions.
+
+### Fixed
+
+- Redacted sensitive values across public inspector paths, mapping keys, CLI
+  diagnostics, JSON, and Markdown without conflating distinct findings.
+- Resolved document-relative dependency links consistently, including normalized
+  paths and transitive references, with bounded traversal and containment checks.
+- Reconciled example scorecards and pressure-report guidance with legacy-only caps.
 
 ## [v2.0.2] - 2026-07-17
 
