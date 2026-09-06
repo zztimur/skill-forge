@@ -6,6 +6,8 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+## [v2.2.0] - 2026-09-06
+
 ### Added
 
 - Transactional verified-archive installation with rollback and obsolete-file removal.
