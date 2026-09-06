@@ -255,9 +255,9 @@ def mac_probe():
     if not Path('/usr/bin/sandbox-exec').exists(): return controls
     with tempfile.TemporaryDirectory(prefix='skill-forge-capability-') as directory:
         root = Path(directory).resolve(); scratch = root / 'scratch'; scratch.mkdir()
-        source = root / 'source'; source.write_text('synthetic')
+        source = root / 'source'; source.write_text('synthetic', encoding="utf-8")
         profile = root / 'policy.sb'
-        profile.write_text('(version 1) (allow default) (deny network*) (deny file-read* (subpath "/Users")) (deny file-write*) (allow file-write* (subpath ' + json.dumps(str(scratch)) + ') (literal "/dev/null"))')
+        profile.write_text('(version 1) (allow default) (deny network*) (deny file-read* (subpath "/Users")) (deny file-write*) (allow file-write* (subpath ' + json.dumps(str(scratch)) + ') (literal "/dev/null"))', encoding="utf-8")
         code = "import json,pathlib,socket,sys\nr={}\ntry: pathlib.Path(sys.argv[1]).write_text('x');r['source_write_denied']=False\nexcept PermissionError:r['source_write_denied']=True\npathlib.Path(sys.argv[2]).write_text('x');r['scratch_write']=True\ntry: socket.socket().connect(('1.1.1.1',443));r['network_denied']=False\nexcept PermissionError:r['network_denied']=True\nprint(json.dumps(r))"
         try:
             result = invoke(['/usr/bin/sandbox-exec', '-f', str(profile), str(Path(sys.executable).resolve()), '-I', '-c', code, str(source), str(scratch / 'allowed')], timeout=5, output_limit=4096)
@@ -283,7 +283,7 @@ def probe(requested_plan=None):
         with tempfile.TemporaryDirectory(prefix='skill-forge-probe-') as directory:
             root = Path(directory); config = root / 'config'; config.mkdir()
             source = root / 'source'; source.mkdir(); source.chmod(0o777)
-            (source / 'canary').write_text('synthetic'); (source / 'canary').chmod(0o666)
+            (source / 'canary').write_text('synthetic', encoding="utf-8"); (source / 'canary').chmod(0o666)
             prefix = docker_prefix(config)
             plan = dict(memory_mib=64, process_limit=16, wall_seconds=15, output_bytes=65536)
             if requested_plan is not None:
@@ -355,7 +355,7 @@ def main():
         if args.probe: result = probe()
         else:
             if args.plan.stat().st_size > 1048576: raise ValueError('Plan exceeds 1 MiB.')
-            result = execute(json.loads(args.plan.read_text()))
+            result = execute(json.loads(args.plan.read_text(encoding="utf-8")))
     except (OSError, ValueError):
         result = dict(schema_version=1, outcome='Execution Error', target_launched=False, reason='Invalid or unavailable reviewed test plan.')
     print(json.dumps(result, indent=2, sort_keys=True))

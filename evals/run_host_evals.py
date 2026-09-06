@@ -56,7 +56,7 @@ def make_record(case, metadata, events, trace, final):
 
 
 def read_lines(path):
-    return [json.loads(x) for x in path.read_text().splitlines() if x.strip()] if path and path.exists() else []
+    return [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()] if path and path.exists() else []
 
 
 def main():
@@ -73,7 +73,7 @@ def main():
     record.add_argument('--final', type=Path, required=True)
     args = parser.parse_args()
     try:
-        suite = json.loads(args.suite.read_text())
+        suite = json.loads(args.suite.read_text(encoding="utf-8"))
         records = read_lines(args.results)
         case = next_case(suite, records)
         if args.command == 'next':
@@ -81,7 +81,7 @@ def main():
             return 0
         if case is None or case['id'] != args.case:
             raise ValueError('Session out of order, duplicated, or exceeds initial pilot budget.')
-        item = make_record(case, json.loads(args.metadata.read_text()), read_lines(args.events), read_lines(args.trace), args.final.read_text())
+        item = make_record(case, json.loads(args.metadata.read_text(encoding="utf-8")), read_lines(args.events), read_lines(args.trace), args.final.read_text(encoding="utf-8"))
         records.append(item)
         with args.results.open('a', encoding='utf-8') as stream:
             stream.write(json.dumps(item, sort_keys=True) + '\n')

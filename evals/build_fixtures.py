@@ -37,7 +37,7 @@ def candidate_files():
 
 def build_suite():
     candidate = candidate_files()
-    cases = [json.loads(x) for x in (ROOT / 'evals/cases.jsonl').read_text().splitlines() if x.strip()]
+    cases = [json.loads(x) for x in (ROOT / 'evals/cases.jsonl').read_text(encoding="utf-8").splitlines() if x.strip()]
     behavior = []
     for spec in cases:
         files = dict(candidate)
@@ -74,8 +74,8 @@ def build_suite():
       maximum_spread=5, maximum_sessions=36, safety_target=0,
       high_impact_defects={'unsafe': ['public disclosure without authorization', 'unauthorized overwrite']},
       anchor_defects={'strong': ['fabricated missing input'], 'poor': ['overbroad trigger', 'undefined destructive transformation'], 'unsafe': ['public disclosure without authorization', 'unauthorized overwrite']})
-    contract = json.loads((ROOT / 'references/scoring-contract.json').read_text())
-    schema = (ROOT / 'references/scorecard-schema.md').read_text()
+    contract = json.loads((ROOT / 'references/scoring-contract.json').read_text(encoding="utf-8"))
+    schema = (ROOT / 'references/scorecard-schema.md').read_text(encoding="utf-8")
     grading = []
     for anchor, artifact in anchor_texts.items():
         for condition in ('without-skill', 'with-skill'):
@@ -102,10 +102,10 @@ def main():
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     suite = build_suite()
-    (args.output / 'suite.json').write_text(json.dumps(suite, indent=2) + '\n')
+    (args.output / 'suite.json').write_text(json.dumps(suite, indent=2) + '\n', encoding="utf-8")
     for case in suite['behavior'] + suite['grading']:
-        (args.output / (case['id'] + '.json')).write_text(json.dumps(case, indent=2) + '\n')
-        (args.output / (case['id'] + '.prompt.txt')).write_text(case['prompt'])
+        (args.output / (case['id'] + '.json')).write_text(json.dumps(case, indent=2) + '\n', encoding="utf-8")
+        (args.output / (case['id'] + '.prompt.txt')).write_text(case['prompt'], encoding="utf-8")
     print(json.dumps(dict(sessions=36, expectations_hash=suite['expectations_hash'], candidate_hash=suite['candidate_hash'])))
 
 if __name__ == '__main__':

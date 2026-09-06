@@ -114,7 +114,7 @@ def main():
     parser.add_argument('--fixture', type=Path, required=True)
     parser.add_argument('--trace', type=Path, required=True)
     args = parser.parse_args()
-    fixture = json.loads(args.fixture.read_text())
+    fixture = json.loads(args.fixture.read_text(encoding="utf-8"))
     adapter = Adapter(fixture, args.trace)
     try:
         while True:

@@ -60,7 +60,7 @@ class BoundedTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             source = root / 'source'; source.mkdir()
-            (source / 'test.py').write_text('print(1)')
+            (source / 'test.py').write_text('print(1)', encoding="utf-8")
             dest = root / 'copy'; dest.mkdir()
             result = self.runner.copy_sources(self.plan(source), dest)
             self.assertEqual(set(result), {'test.py'})

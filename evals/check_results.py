@@ -203,8 +203,8 @@ def main():
     parser.add_argument('--suite', type=Path, required=True)
     parser.add_argument('--results', type=Path, required=True)
     args = parser.parse_args()
-    suite = json.loads(args.suite.read_text())
-    records = [json.loads(x) for x in args.results.read_text().splitlines() if x.strip()]
+    suite = json.loads(args.suite.read_text(encoding="utf-8"))
+    records = [json.loads(x) for x in args.results.read_text(encoding="utf-8").splitlines() if x.strip()]
     report = summarize(suite, records)
     print(json.dumps(report, indent=2))
     return 1 if report['outcome'] == 'Fail' else 0

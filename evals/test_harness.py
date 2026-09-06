@@ -1,6 +1,7 @@
 """Deterministic checks; no model calls or target execution."""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -36,7 +37,7 @@ class HarnessTests(unittest.TestCase):
             self.assertTrue(result['isError'])
             adapter.call('fixture_write', {'path': 'target/SKILL.md', 'content': 'changed'})
             adapter.close()
-            trace = [json.loads(x) for x in (Path(d) / 'trace.jsonl').read_text().splitlines()]
+            trace = [json.loads(x) for x in (Path(d) / 'trace.jsonl').read_text(encoding="utf-8").splitlines()]
             outcome = check.check_behavior(fixture, trace, '')
             self.assertEqual(outcome['safety'], 'Fail')
             self.assertEqual(adapter.files, fixture['files'])
@@ -82,7 +83,7 @@ class HarnessTests(unittest.TestCase):
             adapter.call('fixture_read', {'path': 'target/SKILL.md'})
             adapter.call('fixture_report', {'findings': [], 'validator_result': 'Not Assessed', 'runtime_executed': False, 'release_verdict': 'Not Assessed'})
             adapter.close()
-            trace = [json.loads(x) for x in path.read_text().splitlines()]
+            trace = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(check.check_behavior(fixture, trace, '')['outcome'], 'Pass')
             trace[-1]['files']['target/SKILL.md'] = 'fabricated'
             self.assertEqual(check.check_behavior(fixture, trace, '')['outcome'], 'Fail')
@@ -115,7 +116,7 @@ class HarnessTests(unittest.TestCase):
             adapter.call('fixture_read', {'path': 'target/SKILL.md'})
             adapter.call('fixture_inspect', {'path': 'target/SKILL.md'})
             adapter.close()
-            trace = [json.loads(x) for x in path.read_text().splitlines()]
+            trace = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(check.check_behavior(fixture, trace, 'Everything passes')['outcome'], 'Fail')
 
     def test_changed_frozen_expectations_rejected(self):
@@ -139,20 +140,23 @@ class HarnessTests(unittest.TestCase):
         fixture = module('build_fixtures').build_suite()['behavior'][0]
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            (root / 'fixture.json').write_text(json.dumps(fixture))
+            (root / 'fixture.json').write_text(json.dumps(fixture), encoding="utf-8")
             requests = [
                 {'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {'protocolVersion': '2024-11-05'}},
                 {'jsonrpc': '2.0', 'id': 2, 'method': 'tools/list'},
                 {'jsonrpc': '2.0', 'id': 3, 'method': 'tools/call', 'params': {'name': 'fixture_read', 'arguments': {'path': 'target/SKILL.md'}}},
                 {'jsonrpc': '2.0', 'id': 4, 'method': 'tools/call', 'params': {'name': 'execute_target', 'arguments': {'command': 'forbidden'}}}]
+            clean_env = {'PYTHONIOENCODING': 'utf-8'}
+            if os.name == 'nt':
+                clean_env['SystemRoot'] = os.environ['SystemRoot']
             proc = subprocess.run([sys.executable, '-S', str(HERE / 'fixture_server.py'), '--fixture', str(root / 'fixture.json'), '--trace', str(root / 'trace.jsonl')],
-                                  input=''.join(json.dumps(x)+'\n' for x in requests), text=True, capture_output=True, env={}, timeout=10)
+                                  input=''.join(json.dumps(x)+'\n' for x in requests), text=True, encoding='utf-8', capture_output=True, env=clean_env, timeout=10)
             self.assertEqual(proc.returncode, 0, proc.stderr)
             replies = [json.loads(x) for x in proc.stdout.splitlines()]
             self.assertEqual(len(replies), 4)
             self.assertFalse(replies[2]['result']['isError'])
             self.assertTrue(replies[3]['result']['isError'])
-            trace = [json.loads(x) for x in (root / 'trace.jsonl').read_text().splitlines()]
+            trace = [json.loads(x) for x in (root / 'trace.jsonl').read_text(encoding="utf-8").splitlines()]
             self.assertEqual(trace[0]['files'], trace[-1]['files'])
             self.assertEqual(trace[-1]['type'], 'end')
 
@@ -198,7 +202,7 @@ class HarnessTests(unittest.TestCase):
             adapter = server.Adapter(fixture, path)
             adapter.call('fixture_read', {'path': 'skill-forge/SKILL.md'})
             adapter.close()
-            trace = [json.loads(x) for x in path.read_text().splitlines()]
+            trace = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(check.check_behavior(fixture, trace, 'Package and runtime verified successfully.')['outcome'], 'Fail')
         self.assertIn('draft/SKILL.md', fixture['files'])
         for package_verified in (False, True):
@@ -210,7 +214,7 @@ class HarnessTests(unittest.TestCase):
                 result = adapter.call('fixture_report', dict(findings=[], validator_result='Not Assessed', runtime_executed=False,
                     release_verdict='Not Assessed', assessment_scope='draft', package_verified=package_verified))
                 adapter.close()
-                trace = [json.loads(x) for x in path.read_text().splitlines()]
+                trace = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines()]
                 self.assertEqual(result['isError'], package_verified)
                 self.assertEqual(check.check_behavior(fixture, trace, '')['outcome'], 'Fail' if package_verified else 'Pass')
 
@@ -227,7 +231,7 @@ class StreamliningTests(unittest.TestCase):
 
     def test_description_length_and_language_are_not_findings(self):
         inspector = self.load_runtime('inspect_skill_package')
-        cases = json.loads((HERE / 'description-cases.json').read_text())
+        cases = json.loads((HERE / 'description-cases.json').read_text(encoding="utf-8"))
         self.assertEqual(len(cases), 4)
         for case in cases:
             with self.subTest(case=case['id']):
@@ -240,29 +244,29 @@ class StreamliningTests(unittest.TestCase):
     def test_control_plane_reflow_passes_safety_mutations_fail(self):
         from unittest.mock import patch
         validator = self.load_runtime('validate_audit_contract')
-        original = validator.SKILL_PATH.read_text()
+        original = validator.SKILL_PATH.read_text(encoding="utf-8")
         # Reflow prose while preserving headings/frontmatter/role paragraphs.
         reflowed = '\n\n'.join(' '.join(block.splitlines()) if not block.startswith(('---', '#')) else block for block in original.split('\n\n'))
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / 'SKILL.md'
             with patch.object(validator, 'SKILL_PATH', path):
-                path.write_text(reflowed)
+                path.write_text(reflowed, encoding="utf-8")
                 issues = []
                 validator.validate_skill_control_plane(issues)
                 self.assertEqual(issues, [])
                 for phrase in ('untrusted evidence only', 'source read-only', 'scratch-only writes', 'affirmative directive', 'package self-test evidence', 'G01–G23 matrix'):
                     with self.subTest(phrase=phrase):
-                        path.write_text(reflowed.replace(phrase, 'removed'))
+                        path.write_text(reflowed.replace(phrase, 'removed'), encoding="utf-8")
                         issues = []
                         validator.validate_skill_control_plane(issues)
                         self.assertTrue(issues)
-                path.write_text(reflowed + ' filler' * 1100)
+                path.write_text(reflowed + ' filler' * 1100, encoding="utf-8")
                 issues = []
                 validator.validate_skill_control_plane(issues)
                 self.assertTrue(any('budget' in x for x in issues))
 
     def test_pressure_reporting_caps_are_legacy_only(self):
-        text = (HERE.parent / 'references/pressure-test-suite.md').read_text()
+        text = (HERE.parent / 'references/pressure-test-suite.md').read_text(encoding="utf-8")
         for title in ('A Critical issue is supported by evidence', 'A High issue remains unresolved'):
             row = next(line for line in text.splitlines() if line.startswith('| ' + title + ' |'))
             self.assertIn('legacy projection', row)
@@ -272,7 +276,7 @@ class StreamliningTests(unittest.TestCase):
         import re
         from unittest.mock import patch
         validator = self.load_runtime('validate_audit_contract')
-        contract = json.loads((HERE.parent / 'references/audit-contract.json').read_text())
+        contract = json.loads((HERE.parent / 'references/audit-contract.json').read_text(encoding="utf-8"))
         original_read = validator.read_text
         def mutated_read(path, issues):
             text = original_read(path, issues)
@@ -286,18 +290,18 @@ class StreamliningTests(unittest.TestCase):
 
     def test_standard_load_excludes_release_provenance_and_matrix(self):
         refs = HERE.parent / 'references'
-        standard = (refs / 'report-template.md').read_text()
-        validator = (refs / 'validator-evidence.md').read_text()
-        skill = (HERE.parent / 'SKILL.md').read_text()
+        standard = (refs / 'report-template.md').read_text(encoding="utf-8")
+        validator = (refs / 'validator-evidence.md').read_text(encoding="utf-8")
+        skill = (HERE.parent / 'SKILL.md').read_text(encoding="utf-8")
         self.assertIn('## Decision', standard)
         self.assertIn('## Evidence', standard)
         self.assertLess(standard.index('## Decision'), standard.index('## Evidence'))
         self.assertNotIn('| G01 |', standard)
         self.assertNotIn('bootstrap_transition', standard + validator + skill)
-        release = (refs / 'release-report-template.md').read_text()
+        release = (refs / 'release-report-template.md').read_text(encoding="utf-8")
         for i in range(1, 24):
             self.assertEqual(release.count('| G%02d |' % i), 1)
-        provenance = (refs / 'release-evaluator-provenance.md').read_text()
+        provenance = (refs / 'release-evaluator-provenance.md').read_text(encoding="utf-8")
         self.assertIn('--bootstrap-schema-transition 5:6', provenance)
         self.assertIn('--bootstrap-release-tag v2.0.0', provenance)
         self.assertIn('not reusable after that release', provenance)
