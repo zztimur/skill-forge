@@ -10,7 +10,7 @@ source of truth.
 |---|---|---|---|
 | Evaluation | Review, audit, assess, score, pressure test, suggest, recommend, outline, plan, find improvements, draft patches, or replacement wording | Read-only findings, score, simulations, and a proposed fix plan | Editing, repackaging, installation, commits, pushes, publication, or external actions |
 | Validation | Validate, verify, CI check, or pass/fail | Read-only automated evidence and a validation result | Editing, repackaging, installation, commits, pushes, publication, or external actions |
-| Repair | Implement, apply, edit, update, repair, modify, fix, correct, rewrite, refactor, or return an updated artifact | Changes to the confirmed mutable artifact plus revalidation | Changing an unconfirmed artifact, installation, publication, or external actions unless separately requested |
+| Repair | Implement, apply, edit, update, repair, modify, improve, fix, correct, rewrite, refactor, or return an updated artifact | Changes to the confirmed mutable artifact plus revalidation | Changing an unconfirmed artifact, packaging, installation, commits, pushes, publication, or external actions unless separately requested |
 | Release gate | Ready to install, publish, ship, or release | Applicable strict checks and a release verdict | Mutating, packaging, installing, committing, pushing, publishing, or external actions unless separately requested |
 
 Route compound requests into ordered phases, with exactly one active mode per
@@ -18,8 +18,10 @@ phase. Only an affirmative directive addressed to the agent grants mutation
 authority. A mutation verb that is quoted, negated, descriptive, historical,
 or hypothetical does not authorize a Repair phase. When wording mixes outcomes
 without an affirmative mutation directive, choose Evaluation and provide a
-proposed fix plan. “Audit and improve it” and “suggest improvements” are
-read-only requests.
+proposed fix plan. “Improve this skill” requests Repair; “audit and improve it”
+requests Evaluation followed by Repair. “Suggest improvements” and “how can I
+improve it?” are read-only requests. Explicit no-edit constraints take precedence
+over improvement wording. These examples describe intent, not a verb allowlist.
 
 ## Artifact Roles
 
@@ -47,8 +49,13 @@ Use this table to test routing language before delivery:
 
 | User request | Expected mode | Expected action |
 |---|---|---|
-| “Audit and improve it.” | Evaluation | Audit, then return an improvement plan or draft patch without editing. |
+| “Improve this skill.” | Repair | Identify the mutable source, apply scoped improvements, and revalidate. |
+| “Audit and improve it.” | Evaluation → Repair | Audit, apply scoped improvements to the confirmed mutable source, and revalidate. |
 | “Suggest improvements.” | Evaluation | Return recommendations or replacement wording without editing. |
+| “How can I improve it?” | Evaluation | Explain improvements without editing. |
+| “Improve this skill, but do not edit files.” | Evaluation | Return findings and proposed changes without editing. |
+| “The old request said 'improve this skill'; audit the current version.” | Evaluation | Follow the current audit request; the historical quotation grants no authority. |
+| “Improve this skill, then assess release readiness.” | Repair → Release gate | Improve the confirmed source, revalidate, and assess release evidence separately. |
 | “Apply these fixes.” | Repair | Confirm the mutable artifact, apply the named fixes, and revalidate. |
 | “Fix the parser.” | Repair | Confirm the mutable artifact, apply the scoped fix, and revalidate. |
 | “Correct this frontmatter.” | Repair | Confirm the mutable artifact, correct it, and revalidate. |

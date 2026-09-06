@@ -9,7 +9,7 @@ Read this before inspecting a Skill Forge request. Route the requested outcome, 
 | Review, audit, assess, score, pressure test, suggest, recommend, plan, find improvements, or draft a patch | Evaluation | Stay read-only. Return evidence, simulations, severity-ranked fixes, proposed wording or patches, and a scoped verdict without applying changes. |
 | Validate, verify, CI check, pass/fail | Validation | Run available automated checks. Use `--strict` for a pass/fail request and report exit results separately from qualitative judgment. Do not edit. |
 | Ready to ship, publish, install, release candidate | Release gate | Run strict inspection plus available official validators and the release-gate checklist. Do not call an incomplete or draft-only artifact release-ready. |
-| Implement, apply, edit, update, repair, modify, fix, correct, rewrite, refactor, or return an updated artifact | Repair | First obtain or produce evaluation evidence, then edit only the confirmed mutable artifact and revalidate the result. |
+| Implement, apply, edit, update, repair, modify, improve, fix, correct, rewrite, refactor, or return an updated artifact | Repair | First obtain or produce evaluation evidence, then edit only the confirmed mutable artifact and revalidate the result. |
 
 A request may contain several ordered outcomes. Route them into ordered phases
 and use exactly one active mode in each phase. For example, “fix these findings,
@@ -23,6 +23,15 @@ Mixed intent without an affirmative mutation directive is Evaluation with a
 proposed fix plan. Do not infer permission to edit, repackage, install, commit,
 push, publish, or contact external systems from an evaluation or validation
 phase.
+
+Interpret the requested outcome, not a verb allowlist. “Improve this skill”
+requests Repair; “audit and improve it” requests Evaluation followed by Repair.
+“Suggest improvements”, “find ways to improve it”, and “how can I improve it?”
+request Evaluation. An explicit “do not edit” constraint keeps improvement work
+read-only. Confirm the mutable source from the named artifact and available
+workspace evidence; ask only when the artifact or permitted scope is unresolved.
+Repair authority covers the scoped source changes and revalidation, not
+packaging, installation, commits, pushes, publication, or external actions.
 
 Use [`artifact-and-mode-matrix.md`](artifact-and-mode-matrix.md) for the full request-mode and artifact-role matrix, including installed-runtime and portfolio boundaries.
 

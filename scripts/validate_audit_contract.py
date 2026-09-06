@@ -224,11 +224,18 @@ EXPECTED_ROUTING_RULES = {
     "portable_is_host_certification": False,
 }
 EXPECTED_REQUEST_ROUTING_CASES = [
-    ("negated-fix-is-evaluation", ["Evaluation"], False),
-    ("quoted-fix-is-evaluation", ["Evaluation"], False),
-    ("affirmative-fix-is-repair", ["Repair"], True),
-    ("repair-then-release", ["Repair", "Release gate"], True),
-    ("validation-negates-edit", ["Validation"], False),
+    ("negated-fix-is-evaluation", "Audit this and explain how to fix it. Do not edit.", ["Evaluation"], False),
+    ("quoted-fix-is-evaluation", "The old request said 'fix the parser'; audit the current version.", ["Evaluation"], False),
+    ("affirmative-fix-is-repair", "Fix the parser.", ["Repair"], True),
+    ("repair-then-release", "Fix these findings, then assess release readiness.", ["Repair", "Release gate"], True),
+    ("validation-negates-edit", "Validate but do not edit.", ["Validation"], False),
+    ("affirmative-improve-is-repair", "Improve this skill.", ["Repair"], True),
+    ("audit-then-improve", "Audit and improve it.", ["Evaluation", "Repair"], True),
+    ("suggest-improvements-is-evaluation", "Suggest improvements.", ["Evaluation"], False),
+    ("how-to-improve-is-evaluation", "How can I improve it?", ["Evaluation"], False),
+    ("improve-with-no-edit-is-evaluation", "Improve this skill, but do not edit files.", ["Evaluation"], False),
+    ("quoted-improve-is-evaluation", "The old request said 'improve this skill'; audit the current version.", ["Evaluation"], False),
+    ("improve-then-release", "Improve this skill, then assess release readiness.", ["Repair", "Release gate"], True),
 ]
 EXPECTED_PROFILE_ROUTING_CASES = [
     ("generic-agent-skill", False, ["portable"], [], None),
@@ -257,6 +264,7 @@ EFFECTIVE_LIMITS_END = "<!-- inspector-effective-limits:end -->"
 SEVERITY_SECTIONS_START = "<!-- inspector-severity-sections:start -->"
 SEVERITY_SECTIONS_END = "<!-- inspector-severity-sections:end -->"
 REPAIR_ROUTING_FIXTURES = [
+    "Improve this skill.",
     "Apply these fixes.",
     "Fix the parser.",
     "Correct this frontmatter.",
@@ -672,15 +680,15 @@ def validate_routing_contract(root: Mapping[str, Any], issues: List[str]) -> Non
         issues.append(f"routing_rules must be exactly {EXPECTED_ROUTING_RULES!r}")
 
     request_cases = root.get("request_routing_golden_cases")
-    actual_request_cases: List[tuple[Any, Any, Any]] = []
+    actual_request_cases: List[tuple[Any, Any, Any, Any]] = []
     if isinstance(request_cases, list):
         actual_request_cases = [
-            (case.get("id"), case.get("expected_phases"), case.get("mutation_authorized"))
+            (case.get("id"), case.get("request"), case.get("expected_phases"), case.get("mutation_authorized"))
             for case in request_cases
             if isinstance(case, dict) and isinstance(case.get("request"), str) and case.get("request")
         ]
     if actual_request_cases != EXPECTED_REQUEST_ROUTING_CASES:
-        issues.append("request_routing_golden_cases must preserve negation, quotation, Repair, phased Release, and no-edit cases")
+        issues.append("request_routing_golden_cases must preserve exact requests and outcomes for suggestions, questions, negation, quotation, Repair, phased Release, and no-edit cases")
 
     profile_cases = root.get("profile_routing_golden_cases")
     actual_profile_cases: List[tuple[Any, Any, Any, Any, Any]] = []
@@ -1442,7 +1450,7 @@ def validate_documents(contract: Mapping[str, Any], issues: List[str]) -> None:
     for fixture in REPAIR_ROUTING_FIXTURES:
         if fixture not in texts[MATRIX_PATH] or "Repair" not in texts[MATRIX_PATH]:
             issues.append(f"artifact matrix must keep the Repair routing fixture {fixture!r}")
-    for mutation_verb in ("fix", "correct", "rewrite", "refactor"):
+    for mutation_verb in ("improve", "fix", "correct", "rewrite", "refactor"):
         if mutation_verb not in texts[ROUTING_PATH].lower() or mutation_verb not in texts[MATRIX_PATH].lower():
             issues.append(f"routing references must classify {mutation_verb!r} as Repair")
     for marker in (

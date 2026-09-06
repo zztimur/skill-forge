@@ -54,8 +54,13 @@ Run these probes before the general categories whenever the request leaves the a
 | Only a pasted `SKILL.md` is supplied | Perform a draft-only review and name package-level checks as unavailable. |
 | The user asks “is it release ready?” with no accessible artifact | Request a package/folder; do not assign a release verdict. |
 | The user asks to “fix it” after a vague review | Identify the artifact and evaluation findings before editing; preserve evaluation-only boundaries otherwise. |
-| The user asks to “audit and improve it” | Use Evaluation; return findings and an improvement plan without editing. |
+| The user asks to “improve this skill” | Use Repair; identify the mutable source, apply scoped improvements, and revalidate. |
+| The user asks to “audit and improve it” | Use Evaluation followed by Repair; audit, apply scoped improvements, and revalidate. |
 | The user asks to “suggest improvements” | Use Evaluation; provide recommendations or draft wording without editing. |
+| The user asks “how can I improve it?” | Use Evaluation; explain improvements without editing. |
+| The user asks to “improve this skill, but do not edit files” | Use Evaluation; honor the explicit no-edit constraint. |
+| A historical quotation says “improve this skill”; the current request is audit only | Use Evaluation; the quotation does not authorize changes. |
+| The user asks to “improve this skill, then assess release readiness” | Use Repair followed by Release gate; preserve both evidence sets. |
 | The user asks to “apply these fixes” | Use Repair only after confirming the mutable artifact. |
 | The user asks to “validate but do not edit” | Use Validation; run checks and make no changes. |
 | The user asks to repair an installed runtime | Locate and confirm the mutable source checkout before editing; do not package from the installed runtime. |

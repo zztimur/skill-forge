@@ -4064,6 +4064,7 @@ def run_routing_fixture_case() -> dict[str, Any]:
         validator_evidence = (references / "validator-evidence.md").read_text(encoding="utf-8").lower()
         skill = (CONTRACT_VALIDATOR.parent.parent / "SKILL.md").read_text(encoding="utf-8").lower()
         fixtures = (
+            "Improve this skill.",
             "Apply these fixes.",
             "Fix the parser.",
             "Correct this frontmatter.",
@@ -4084,12 +4085,28 @@ def run_routing_fixture_case() -> dict[str, Any]:
         dropped_case["request_routing_golden_cases"] = dropped_case["request_routing_golden_cases"][:-1]
         case_issues: list[str] = []
         validator.validate_routing_contract(dropped_case, case_issues)
+        # A golden case binds the actual request, not only its id and result.
+        # Exercise every case so positive and negative authority cannot drift.
+        missed_mutations: list[str] = []
+        for index, case in enumerate(contract["request_routing_golden_cases"]):
+            for field, replacement in (
+                ("request", "Publish this skill now."),
+                ("mutation_authorized", not case["mutation_authorized"]),
+                ("expected_phases", ["Validation"] if case["expected_phases"] != ["Validation"] else ["Repair"]),
+            ):
+                changed = json.loads(json.dumps(contract))
+                changed["request_routing_golden_cases"][index][field] = replacement
+                mutation_issues: list[str] = []
+                validator.validate_routing_contract(changed, mutation_issues)
+                if not any("request_routing_golden_cases" in issue for issue in mutation_issues):
+                    missed_mutations.append(f"{case['id']}:{field}")
         ok = (
             not clean_issues
+            and not missed_mutations
             and any("routing_rules" in issue for issue in weakened_issues)
             and any("routing_rules" in issue for issue in collapsed_issues)
             and any("request_routing_golden_cases" in issue for issue in case_issues)
-            and all(verb in routing for verb in ("fix", "correct", "rewrite", "refactor"))
+            and all(verb in routing for verb in ("improve", "fix", "correct", "rewrite", "refactor"))
             and all(fixture in matrix for fixture in fixtures)
             and matrix.count("| Repair |") >= len(fixtures)
             and all(
@@ -4112,7 +4129,7 @@ def run_routing_fixture_case() -> dict[str, Any]:
         reason = "" if ok else (
             "routing contract or prose drifted: "
             f"clean={clean_issues!r}; weakened={weakened_issues!r}; "
-            f"collapsed={collapsed_issues!r}; cases={case_issues!r}"
+            f"collapsed={collapsed_issues!r}; cases={case_issues!r}; missed={missed_mutations!r}"
         )
     except OSError as exc:
         ok = False

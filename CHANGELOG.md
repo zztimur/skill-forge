@@ -6,6 +6,11 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+### Fixed
+
+- Route direct requests to improve a skill into scoped Repair while keeping suggestions, questions, historical quotations, and explicit no-edit requests read-only.
+- Preserve exact request text in routing golden cases so changing a prompt cannot silently retain an unrelated expected result.
+
 ## [v2.2.0] - 2026-09-06
 
 ### Added

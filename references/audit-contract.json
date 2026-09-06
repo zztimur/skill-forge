@@ -260,6 +260,48 @@
         "Validation"
       ],
       "mutation_authorized": false
+    },
+    {
+      "id": "affirmative-improve-is-repair",
+      "request": "Improve this skill.",
+      "expected_phases": ["Repair"],
+      "mutation_authorized": true
+    },
+    {
+      "id": "audit-then-improve",
+      "request": "Audit and improve it.",
+      "expected_phases": ["Evaluation", "Repair"],
+      "mutation_authorized": true
+    },
+    {
+      "id": "suggest-improvements-is-evaluation",
+      "request": "Suggest improvements.",
+      "expected_phases": ["Evaluation"],
+      "mutation_authorized": false
+    },
+    {
+      "id": "how-to-improve-is-evaluation",
+      "request": "How can I improve it?",
+      "expected_phases": ["Evaluation"],
+      "mutation_authorized": false
+    },
+    {
+      "id": "improve-with-no-edit-is-evaluation",
+      "request": "Improve this skill, but do not edit files.",
+      "expected_phases": ["Evaluation"],
+      "mutation_authorized": false
+    },
+    {
+      "id": "quoted-improve-is-evaluation",
+      "request": "The old request said 'improve this skill'; audit the current version.",
+      "expected_phases": ["Evaluation"],
+      "mutation_authorized": false
+    },
+    {
+      "id": "improve-then-release",
+      "request": "Improve this skill, then assess release readiness.",
+      "expected_phases": ["Repair", "Release gate"],
+      "mutation_authorized": true
     }
   ],
   "profile_routing_golden_cases": [

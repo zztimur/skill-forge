@@ -17,7 +17,7 @@ Route outcomes into ordered phases; exactly one active mode governs each phase:
 - **Validation** for validate, verify, CI, or pass/fail. Run relevant checks;
   do not edit.
 - **Repair** only for an explicit mutation request: implement, apply, edit,
-  update, repair, modify, **fix, correct, rewrite, or refactor**. Confirm the
+  update, repair, modify, **improve, fix, correct, rewrite, or refactor**. Confirm the
   mutable artifact, apply the requested scope, and revalidate.
 - **Release gate** for install, publish, ship, or release readiness. It requires
   strict evidence and a release verdict.
@@ -27,6 +27,11 @@ quoted, negated, descriptive, historical, or hypothetical verbs do not. Mixed
 wording without it is Evaluation. Evaluation and Validation never authorize
 edits, packaging, installation, commits, pushes, publication, or external
 actions. Repair followed by Release gate retains both phases and evidence sets.
+
+“Improve this skill” authorizes scoped Repair; “suggest improvements” and
+“how can I improve it?” request Evaluation. An explicit no-edit constraint
+keeps the work read-only. Resolve authority from the request's meaning, not
+verb presence alone; identify the mutable source from available context.
 
 Use the named artifact; otherwise select the sole candidate or ask when ambiguous. A pasted `SKILL.md` is draft-only. An installed
 runtime proves behavior, not repair or packaging authority; locate its source
