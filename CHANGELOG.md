@@ -6,6 +6,8 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+## [v2.2.1] - 2026-09-06
+
 ### Fixed
 
 - Route direct requests to improve a skill into scoped Repair while keeping suggestions, questions, historical quotations, and explicit no-edit requests read-only.
