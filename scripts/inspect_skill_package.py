@@ -2015,6 +2015,11 @@ def is_lookup_only_password_assignment(text: str, match: Any, path: Path) -> boo
     if path.suffix.lower() not in {".js", ".mjs", ".cjs"}:
         return False
     start = text.rfind("\n", 0, match.start()) + 1
+    # Without a JS parser, earlier template delimiters make lexical context
+    # uncertain (including nested/interpolated/escaped templates). Retain the
+    # warning even if a preceding template looks closed; never mask its content.
+    if "`" in text[:start]:
+        return False
     end = text.find("\n", match.start())
     line = text[start:] if end == -1 else text[start:end]
     member = r"(?:flags|opts|process\.env)\.[A-Za-z_$][A-Za-z0-9_$]*"
