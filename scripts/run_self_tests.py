@@ -2012,6 +2012,8 @@ def password_assignment_cases() -> list[TestCase]:
         ("concatenation after member", prefix + "flags.password + " + literal + ";\n", "example.mjs"),
         ("quoted declaration then literal", 'const note = "' + lookup.strip() + '"; password = ' + literal + ";\n", "example.mjs"),
         ("template declaration then literal", "const note = `" + lookup.strip() + "`; password = " + literal + ";\n", "example.mjs"),
+        ("multiline template literal", prefix + "`\n" + lookup + "`;\n", "example.mjs"),
+        ("preceding template syntax stays conservative", "const note = `example`;\n" + lookup, "example.mjs"),
         ("comment declaration then literal", "/* " + lookup.strip() + " */ password = " + literal + ";\n", "example.mjs"),
         ("multiline fallback", prefix + "flags.password\n || " + literal + ";\n", "example.mjs"),
     ):
