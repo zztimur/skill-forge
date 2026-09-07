@@ -1947,6 +1947,89 @@ def make_secret_content_skill(name: str, filename: str, content: str) -> Callabl
     return build
 
 
+def make_password_assignment_fixture(
+    content: str, filename: str = "example.mjs", *, archive: bool = False,
+    outside: bool = False,
+) -> Callable[[Path], Path]:
+    """Exercise password findings through the real folder/ZIP inspection path."""
+    def build(tmp: Path) -> Path:
+        skill = write_valid_skill(tmp, "password-lookup-skill")
+        script = (tmp if outside else skill) / filename
+        script.write_text(content, encoding="utf-8")
+        if not outside:
+            with (skill / "SKILL.md").open("a", encoding="utf-8") as stream:
+                stream.write(f"\nReview `{filename}` as source data; do not execute it.\n")
+        if not archive:
+            return tmp if outside else skill
+        target = tmp / "password-lookup.zip"
+        members = [p for p in skill.rglob("*") if p.is_file()]
+        if outside:
+            members.append(script)
+        with zipfile.ZipFile(target, "w") as bundle:
+            for member in members:
+                bundle.write(member, member.relative_to(tmp).as_posix())
+        return target
+    return build
+
+
+def check_no_password_assignment(data: dict[str, Any]) -> tuple[bool, str]:
+    codes = {item.get("code") for item in iter_findings(data)}
+    if codes & {"secret_password_assignment", "secret_password_assignment_outside_root"}:
+        return False, "lookup-only declaration was reported as a bundled password"
+    return True, ""
+
+
+def password_assignment_cases() -> list[TestCase]:
+    prefix = "const password = "
+    lookup = prefix + "flags.password || process.env.IMGFLIP_PASS;\n"
+    literal = '"synthetic-example-only"'
+    cases = []
+    for filename in ("example.js", "example.mjs", "example.cjs"):
+        cases.append(TestCase(
+            f"password lookup-only declaration in {filename}",
+            make_password_assignment_fixture(lookup, filename), 0,
+            checker=check_no_password_assignment,
+        ))
+    for label, content in (
+        ("direct environment", prefix + "process.env.SERVICE_PASSWORD;\n"),
+        ("opts nullish fallback", "let password = " + "opts.password ?? process.env.SERVICE_PASSWORD;\n"),
+        ("var lookup", "var password = " + "flags.password;\n"),
+    ):
+        cases.append(TestCase(f"password {label} lookup", make_password_assignment_fixture(content), 0, checker=check_no_password_assignment))
+    for label, content, filename in (
+        ("quoted literal", prefix + literal + ";\n", "example.mjs"),
+        ("literal fallback", prefix + "flags.password || " + literal + ";\n", "example.mjs"),
+        ("nullish literal fallback", prefix + "opts.password ?? " + literal + ";\n", "example.mjs"),
+        ("later literal", lookup + "password = " + literal + ";\n", "example.mjs"),
+        ("same-line later literal", lookup.rstrip() + " password = " + literal + ";\n", "example.mjs"),
+        ("unquoted config", "password = " + "synthetic-example-only\n", "config.txt"),
+        ("dotted config", "password = " + "synthetic.example.only\n", "config.txt"),
+        ("lookup-looking config", "password = " + "flags.password\n", "config.txt"),
+        ("unknown expression", prefix + "getPassword();\n", "example.mjs"),
+        ("unknown extension", lookup, "example.ts"),
+        ("bracket expression", prefix + "flags[lookupName];\n", "example.mjs"),
+        ("call after member", prefix + "flags.password();\n", "example.mjs"),
+        ("concatenation after member", prefix + "flags.password + " + literal + ";\n", "example.mjs"),
+        ("quoted declaration then literal", 'const note = "' + lookup.strip() + '"; password = ' + literal + ";\n", "example.mjs"),
+        ("template declaration then literal", "const note = `" + lookup.strip() + "`; password = " + literal + ";\n", "example.mjs"),
+        ("multiline template literal", prefix + "`\n" + lookup + "`;\n", "example.mjs"),
+        ("preceding template syntax stays conservative", "const note = `example`;\n" + lookup, "example.mjs"),
+        ("comment declaration then literal", "/* " + lookup.strip() + " */ password = " + literal + ";\n", "example.mjs"),
+        ("multiline fallback", prefix + "flags.password\n || " + literal + ";\n", "example.mjs"),
+    ):
+        cases.append(TestCase(f"password detection retains {label}", make_password_assignment_fixture(content, filename), 0, "secret_password_assignment", expected_severity="warning"))
+    for archive in (False, True):
+        kind = "ZIP" if archive else "folder"
+        for outside in (False, True):
+            location = "outside root" if outside else "inside root"
+            expected_exit = 2 if outside else 0
+            suffix = "_outside_root" if outside else ""
+            cases.append(TestCase(f"password lookup {kind} {location}", make_password_assignment_fixture(lookup, archive=archive, outside=outside), expected_exit, checker=check_no_password_assignment))
+            cases.append(TestCase(f"password literal {kind} {location}", make_password_assignment_fixture(prefix + literal + ";\n", archive=archive, outside=outside), expected_exit, "secret_password_assignment" + suffix, expected_severity="warning"))
+            cases.append(TestCase(f"password lookup then literal {kind} {location}", make_password_assignment_fixture(lookup + "password = " + literal + ";\n", archive=archive, outside=outside), expected_exit, "secret_password_assignment" + suffix, expected_severity="warning"))
+    return cases
+
+
 def build_bad_zip_archive(tmp: Path) -> Path:
     target = tmp / "corrupt.zip"
     target.write_bytes(b"PK\x03\x04 this is not a valid zip central directory")
@@ -4554,7 +4637,7 @@ def run_scorecard_case() -> dict:
 
 
 def main() -> int:
-    cases = [
+    cases = password_assignment_cases() + [
         TestCase("canonical missing dependency exits 2", lambda tmp: build_resource_path_fixture(tmp, "", False), 2, "missing_resource_reference"),
         TestCase("dot-relative missing dependency exits 2", lambda tmp: build_resource_path_fixture(tmp, "./", False), 2, "missing_resource_reference"),
         TestCase("canonical valid dependency exits 0", lambda tmp: build_resource_path_fixture(tmp, "", True), 0),

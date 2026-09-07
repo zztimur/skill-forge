@@ -2006,6 +2006,33 @@ def read_safety_text(path: Path, max_safety_scan_bytes: Optional[int]) -> Tuple[
     return text, truncated, None
 
 
+def is_lookup_only_password_assignment(
+    text: str, match: Any, path: Path, first_template_offset: int,
+) -> bool:
+    """Recognize a small complete JS declaration, never a safe-looking prefix.
+
+    A mandatory semicolon excludes ASI/multiline continuations. Unknown syntax
+    keeps the existing warning. This exception does not affect public redaction.
+    """
+    if path.suffix.lower() not in {".js", ".mjs", ".cjs"}:
+        return False
+    start = text.rfind("\n", 0, match.start()) + 1
+    # Without a JS parser, earlier template delimiters make lexical context
+    # uncertain (including nested/interpolated/escaped templates). Retain the
+    # warning even if a preceding template looks closed; never mask its content.
+    if 0 <= first_template_offset < start:
+        return False
+    end = text.find("\n", match.start())
+    line = text[start:] if end == -1 else text[start:end]
+    member = r"(?:flags|opts|process\.env)\.[A-Za-z_$][A-Za-z0-9_$]*"
+    declaration = re.fullmatch(
+        r"[ \t]*(?:const|let|var)[ \t]+(?P<name>password)[ \t]*=[ \t]*"
+        + member + r"(?:[ \t]*(?:\|\||\?\?)[ \t]*" + member + r")*"
+        + r"[ \t]*;[ \t]*\r?", line,
+    )
+    return declaration is not None and start + declaration.start("name") == match.start()
+
+
 def secret_findings_for_path(
     path: Path,
     name_match_target: str,
@@ -2041,8 +2068,14 @@ def secret_findings_for_path(
         findings.append(finding("error", f"secret_scan_unreadable{suffix}", "eligible file could not be read for the bounded secret scan; inspection is incomplete", file=display_rel))
         result.incomplete_paths.append(display_rel)
         return result
+    first_template_offset = text.find("`")
     for label, code, severity, pattern in SECRET_CONTENT_PATTERNS:
-        if pattern.search(text):
+        matches = pattern.finditer(text)
+        if any(
+            code != "secret_password_assignment"
+            or not is_lookup_only_password_assignment(text, match, path, first_template_offset)
+            for match in matches
+        ):
             message = f"possible {label} found" + (" outside the detected skill root" if outside_root else "")
             findings.append(finding(severity, f"{code}{suffix}", message, file=display_rel, risk=label, pattern=pattern.pattern))
             break
