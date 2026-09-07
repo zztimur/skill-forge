@@ -2009,6 +2009,10 @@ def password_assignment_cases() -> list[TestCase]:
         ("unknown extension", lookup, "example.ts"),
         ("bracket expression", prefix + "flags[lookupName];\n", "example.mjs"),
         ("call after member", prefix + "flags.password();\n", "example.mjs"),
+        ("concatenation after member", prefix + "flags.password + " + literal + ";\n", "example.mjs"),
+        ("quoted declaration then literal", 'const note = "' + lookup.strip() + '"; password = ' + literal + ";\n", "example.mjs"),
+        ("template declaration then literal", "const note = `" + lookup.strip() + "`; password = " + literal + ";\n", "example.mjs"),
+        ("comment declaration then literal", "/* " + lookup.strip() + " */ password = " + literal + ";\n", "example.mjs"),
         ("multiline fallback", prefix + "flags.password\n || " + literal + ";\n", "example.mjs"),
     ):
         cases.append(TestCase(f"password detection retains {label}", make_password_assignment_fixture(content, filename), 0, "secret_password_assignment", expected_severity="warning"))
@@ -2020,6 +2024,7 @@ def password_assignment_cases() -> list[TestCase]:
             suffix = "_outside_root" if outside else ""
             cases.append(TestCase(f"password lookup {kind} {location}", make_password_assignment_fixture(lookup, archive=archive, outside=outside), expected_exit, checker=check_no_password_assignment))
             cases.append(TestCase(f"password literal {kind} {location}", make_password_assignment_fixture(prefix + literal + ";\n", archive=archive, outside=outside), expected_exit, "secret_password_assignment" + suffix, expected_severity="warning"))
+            cases.append(TestCase(f"password lookup then literal {kind} {location}", make_password_assignment_fixture(lookup + "password = " + literal + ";\n", archive=archive, outside=outside), expected_exit, "secret_password_assignment" + suffix, expected_severity="warning"))
     return cases
 
 
