@@ -6,6 +6,8 @@ top until the local release command promotes them into a versioned entry.
 
 ## [Unreleased]
 
+## [v2.2.3] - 2026-09-06
+
 ### Fixed
 
 - Avoid bundled-password warnings for complete JavaScript CLI/environment lookup declarations while retaining detection of hardcoded passwords, literal fallbacks, other assignments, and configuration values.
